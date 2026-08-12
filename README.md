@@ -3,6 +3,7 @@
 Realtime API health monitoring backend built with Java and Spring Boot. The service registers APIs, checks them on a schedule, evaluates UP/DOWN status, opens alerts, sends email, and creates Jira tickets.
 
 [![CI](https://github.com/ShayanIrfan07/API-Tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/ShayanIrfan07/API-Tracker/actions/workflows/ci.yml)
+[![CD](https://github.com/ShayanIrfan07/API-Tracker/actions/workflows/cd.yml/badge.svg)](https://github.com/ShayanIrfan07/API-Tracker/actions/workflows/cd.yml)
 
 ## Requirements
 
@@ -35,6 +36,30 @@ mvn spring-boot:run
 ```
 
 See `.env.example` for configuration. Do not commit real secrets.
+
+### Docker image (CD)
+
+On every push to `main`, GitHub Actions builds and publishes:
+
+- Container image: `ghcr.io/shayanirfan07/api-tracker:latest` (also `sha-…` tags)
+- JAR build artifact in the Actions run
+
+Tagged releases (`v1.0.0`, etc.) also create a GitHub Release with the JAR attached.
+
+Pull and run with Compose (app profile):
+
+```powershell
+docker pull ghcr.io/shayanirfan07/api-tracker:latest
+docker compose --profile app up -d
+```
+
+If the package is private, authenticate first:
+
+```powershell
+echo $env:GITHUB_TOKEN | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+```
+
+Workflows: [CI](https://github.com/ShayanIrfan07/API-Tracker/actions/workflows/ci.yml) · [CD](https://github.com/ShayanIrfan07/API-Tracker/actions/workflows/cd.yml)
 
 ## Dashboard (Phase 4)
 

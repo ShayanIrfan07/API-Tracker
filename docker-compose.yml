@@ -24,5 +24,35 @@ services:
       - "${MAILPIT_UI_PORT:-8025}:8025"
     restart: unless-stopped
 
+  app:
+    image: ${API_TRACKER_IMAGE:-ghcr.io/shayanirfan07/api-tracker:latest}
+    container_name: api-tracker-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-api_tracker}
+      DB_USERNAME: ${POSTGRES_USER:-api_tracker}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-api_tracker}
+      SERVER_PORT: 8080
+      MAIL_ENABLED: ${MAIL_ENABLED:-true}
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_SMTP_AUTH: "false"
+      MAIL_SMTP_STARTTLS: "false"
+      MAIL_FROM: ${MAIL_FROM:-noreply@apitracker.local}
+      API_TRACKER_API_KEY: ${API_TRACKER_API_KEY:-}
+      REQUIRE_API_KEY: ${REQUIRE_API_KEY:-false}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-secret-key-32b}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+    profiles: ["app"]
+    restart: unless-stopped
+
 volumes:
   api_tracker_pgdata:
