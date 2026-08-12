@@ -13,12 +13,12 @@ import org.springframework.core.env.MapPropertySource;
 import org.springframework.util.StringUtils;
 
 /**
- * Adapts Railway (and similar PaaS) env vars:
+ * Adapts PaaS env vars (e.g. Render):
  * - {@code PORT} already mapped via application.yml
  * - {@code DATABASE_URL} (postgres://...) → JDBC datasource settings when {@code DB_URL} is unset
  */
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
-public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor {
+public class DatabaseUrlEnvironmentPostProcessor implements EnvironmentPostProcessor {
 
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
@@ -44,12 +44,12 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
                     props.put("spring.datasource.password", parsed.password());
                 }
             } catch (IllegalArgumentException ex) {
-                throw new IllegalStateException("Invalid DATABASE_URL for Railway/Postgres binding", ex);
+                throw new IllegalStateException("Invalid DATABASE_URL for Postgres binding", ex);
             }
         }
 
         if (!props.isEmpty()) {
-            environment.getPropertySources().addFirst(new MapPropertySource("railwayAdapter", props));
+            environment.getPropertySources().addFirst(new MapPropertySource("databaseUrlAdapter", props));
         }
     }
 
@@ -80,7 +80,7 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
             }
 
             int port = uri.getPort() > 0 ? uri.getPort() : 5432;
-            String path = uri.getPath() == null || uri.getPath().isBlank() ? "/railway" : uri.getPath();
+            String path = uri.getPath() == null || uri.getPath().isBlank() ? "/postgres" : uri.getPath();
             String jdbc = "jdbc:postgresql://" + uri.getHost() + ":" + port + path;
             if (StringUtils.hasText(uri.getQuery())) {
                 jdbc = jdbc + "?" + uri.getQuery();

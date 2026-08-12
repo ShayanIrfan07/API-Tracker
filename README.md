@@ -37,29 +37,50 @@ mvn spring-boot:run
 
 See `.env.example` for configuration. Do not commit real secrets.
 
-### Deploy on Railway
+### Deploy on Render (free tier)
 
-1. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub** → select `API-Tracker`
-2. Add a **PostgreSQL** plugin/service to the same project (Railway injects `DATABASE_URL`)
-3. In the **web service** variables, set at least:
+**Option A — Blueprint (fastest)**
 
-| Variable | Suggested value |
-|----------|-----------------|
+1. Go to [render.com](https://render.com) → sign in with **GitHub**
+2. **New** → **Blueprint**
+3. Connect repo **`ShayanIrfan07/API-Tracker`**
+4. Render reads `render.yaml` and creates:
+   - Free **PostgreSQL** database
+   - Free **Web Service** (Docker) with `DATABASE_URL` linked
+5. Review generated secrets (`JWT_SECRET`, `ADMIN_PASSWORD`, `API_TRACKER_API_KEY`) in the web service **Environment** tab
+6. Wait for deploy to finish → open the `*.onrender.com` URL
+7. Log in: username `admin`, password = generated `ADMIN_PASSWORD` (copy from Render env vars)
+
+**Option B — Manual setup**
+
+1. **New** → **PostgreSQL** (Free) → note the **Internal Database URL**
+2. **New** → **Web Service** → connect GitHub repo `API-Tracker`
+3. Settings:
+   - **Runtime:** Docker
+   - **Branch:** `main`
+   - **Health Check Path:** `/actuator/health`
+4. **Environment** variables:
+
+| Variable | Value |
+|----------|--------|
+| `DATABASE_URL` | Internal Database URL from step 1 |
 | `JWT_SECRET` | long random string (32+ chars) |
 | `ADMIN_USERNAME` | `admin` |
 | `ADMIN_PASSWORD` | strong password |
 | `REQUIRE_API_KEY` | `true` |
 | `API_TRACKER_API_KEY` | random API key |
-| `MAIL_ENABLED` | `false` (enable later with real SMTP) |
+| `MAIL_ENABLED` | `false` |
 
-`PORT` and `DATABASE_URL` are provided by Railway automatically. This app converts `DATABASE_URL` to JDBC.
+5. **Create Web Service** → wait for build (first run ~10–15 min)
+6. Open `https://<your-service>.onrender.com` and log in
 
-4. Generate a public domain: service → **Settings** → **Networking** → **Generate domain**
-5. Open `https://<your-app>.up.railway.app` and log in with the admin credentials above
+**Free tier notes**
 
-Config file: `railway.toml` (Dockerfile build + `/actuator/health` check).
+- Web service may **sleep after ~15 minutes** of no traffic; first request after sleep can take 30–60s
+- Free Postgres may have storage/time limits — check [Render pricing](https://render.com/pricing)
+- `PORT` and `DATABASE_URL` are set by Render; the app maps them automatically
 
-Optional email later: set `MAIL_ENABLED=true` and SMTP vars (`MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_SMTP_AUTH=true`, `MAIL_SMTP_STARTTLS=true`).
+Optional email later: `MAIL_ENABLED=true` plus SMTP vars (`MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_SMTP_AUTH=true`, `MAIL_SMTP_STARTTLS=true`).
 
 ### Docker image (CD)
 
