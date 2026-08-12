@@ -37,6 +37,30 @@ mvn spring-boot:run
 
 See `.env.example` for configuration. Do not commit real secrets.
 
+### Deploy on Railway
+
+1. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub** → select `API-Tracker`
+2. Add a **PostgreSQL** plugin/service to the same project (Railway injects `DATABASE_URL`)
+3. In the **web service** variables, set at least:
+
+| Variable | Suggested value |
+|----------|-----------------|
+| `JWT_SECRET` | long random string (32+ chars) |
+| `ADMIN_USERNAME` | `admin` |
+| `ADMIN_PASSWORD` | strong password |
+| `REQUIRE_API_KEY` | `true` |
+| `API_TRACKER_API_KEY` | random API key |
+| `MAIL_ENABLED` | `false` (enable later with real SMTP) |
+
+`PORT` and `DATABASE_URL` are provided by Railway automatically. This app converts `DATABASE_URL` to JDBC.
+
+4. Generate a public domain: service → **Settings** → **Networking** → **Generate domain**
+5. Open `https://<your-app>.up.railway.app` and log in with the admin credentials above
+
+Config file: `railway.toml` (Dockerfile build + `/actuator/health` check).
+
+Optional email later: set `MAIL_ENABLED=true` and SMTP vars (`MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_SMTP_AUTH=true`, `MAIL_SMTP_STARTTLS=true`).
+
 ### Docker image (CD)
 
 On every push to `main`, GitHub Actions builds and publishes:
@@ -200,7 +224,7 @@ Emails do **not** go to Gmail while using Mailpit — only the Mailpit UI.
 | `RATE_LIMIT_CHECK_NOW_PER_MIN` | Manual check-now per IP | `30` |
 | `CHECK_RETENTION_ENABLED` | Purge old check results | `true` |
 | `CHECK_RETENTION_DAYS` | Retention window | `30` |
-| `MAIL_ENABLED` | Enable email | `true` |
+| `MAIL_ENABLED` | Enable email | `false` |
 | `MAIL_FROM` | From address | `noreply@apitracker.local` |
 | `MAIL_HOST` / `MAIL_PORT` | SMTP host/port | `localhost` / `1025` |
 | `MAIL_USERNAME` / `MAIL_PASSWORD` | SMTP credentials | empty (Mailpit) |

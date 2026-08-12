@@ -43,13 +43,13 @@ management:
   health:
     mail:
       # Follows MAIL_ENABLED so unused/misconfigured SMTP does not mark health DOWN
-      enabled: ${MAIL_ENABLED:true}
+      enabled: ${MAIL_ENABLED:false}
   metrics:
     tags:
       application: ${spring.application.name}
 
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${PORT:${SERVER_PORT:8080}}
 
 logging:
   level:
@@ -81,7 +81,7 @@ app:
     retention-days: ${CHECK_RETENTION_DAYS:30}
     retention-cron: ${CHECK_RETENTION_CRON:0 30 2 * * *}
   mail:
-    enabled: ${MAIL_ENABLED:true}
+    enabled: ${MAIL_ENABLED:false}
     from: ${MAIL_FROM:noreply@apitracker.local}
   jira:
     enabled: ${JIRA_ENABLED:false}
