@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>API Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div class="atmosphere" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand-block">
+      <p class="brand">API Tracker</p>
+      <p class="tagline">Live endpoint health for your team</p>
+    </div>
+    <div class="auth-row" id="authLoggedOut">
+      <input id="loginUsername" type="text" placeholder="Username" autocomplete="username" value="admin" />
+      <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" value="admin" />
+      <button type="button" id="loginBtn" class="btn btn-primary">Login</button>
+    </div>
+    <div class="auth-row" id="authLoggedIn" hidden>
+      <span class="auth-label" id="loggedInUser"></span>
+      <button type="button" id="logoutBtn" class="btn btn-quiet">Logout</button>
+      <button type="button" id="refreshBtn" class="btn btn-primary">Refresh</button>
+    </div>
+  </header>
+
+  <details class="advanced-auth">
+    <summary>Advanced: API key fallback</summary>
+    <div class="auth-row">
+      <label class="auth-label" for="apiKey">API key</label>
+      <input id="apiKey" type="password" placeholder="X-API-Key (optional)" autocomplete="off" />
+      <button type="button" id="saveKeyBtn" class="btn btn-quiet">Save key</button>
+    </div>
+  </details>
+
+  <main class="layout">
+    <section class="summary" aria-label="Status summary">
+      <div class="metric" data-metric="total">
+        <span class="metric-value" id="metricTotal">0</span>
+        <span class="metric-label">Monitored</span>
+      </div>
+      <div class="metric" data-metric="up">
+        <span class="metric-value" id="metricUp">0</span>
+        <span class="metric-label">Up</span>
+      </div>
+      <div class="metric" data-metric="degraded">
+        <span class="metric-value" id="metricDegraded">0</span>
+        <span class="metric-label">Degraded</span>
+      </div>
+      <div class="metric" data-metric="down">
+        <span class="metric-value" id="metricDown">0</span>
+        <span class="metric-label">Down</span>
+      </div>
+      <div class="metric" data-metric="alerts">
+        <span class="metric-value" id="metricAlerts">0</span>
+        <span class="metric-label">Open alerts</span>
+      </div>
+      <div class="metric" data-metric="uptime">
+        <span class="metric-value" id="metricUptime">—</span>
+        <span class="metric-label">24h uptime</span>
+      </div>
+      <div class="metric" data-metric="latency">
+        <span class="metric-value" id="metricLatency">—</span>
+        <span class="metric-label">24h avg latency</span>
+      </div>
+    </section>
+
+    <p id="statusBanner" class="banner" hidden></p>
+
+    <div class="workspace">
+      <section class="panel" aria-labelledby="apisHeading">
+        <div class="panel-head">
+          <h2 id="apisHeading">Monitored APIs</h2>
+          <p class="panel-sub">Current status from the check engine</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>24h uptime</th>
+                <th>Avg latency</th>
+                <th>Endpoint</th>
+                <th>Last checked</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="apisBody">
+              <tr><td colspan="7" class="empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <aside class="side">
+        <section class="panel" aria-labelledby="alertsHeading">
+          <div class="panel-head">
+            <h2 id="alertsHeading">Open alerts</h2>
+            <p class="panel-sub">Active outages</p>
+          </div>
+          <ul id="alertsList" class="alert-list">
+            <li class="empty">Loading…</li>
+          </ul>
+        </section>
+
+        <section class="panel form-panel" aria-labelledby="addHeading">
+          <div class="panel-head">
+            <h2 id="addHeading">Register API</h2>
+            <p class="panel-sub">Add an endpoint to watch</p>
+          </div>
+          <form id="createForm" class="stack-form">
+            <label>Name
+              <input name="name" required maxlength="100" placeholder="Payments Health" />
+            </label>
+            <label>Base URL
+              <input name="baseUrl" required maxlength="500" placeholder="https://api.example.com" />
+            </label>
+            <label>Path
+              <input name="path" maxlength="500" placeholder="/health" value="/health" />
+            </label>
+            <div class="form-grid">
+              <label>Method
+                <select name="httpMethod">
+                  <option>GET</option>
+                  <option>POST</option>
+                  <option>PUT</option>
+                  <option>PATCH</option>
+                  <option>DELETE</option>
+                  <option>HEAD</option>
+                </select>
+              </label>
+              <label>Expected status
+                <input name="expectedStatusCode" type="number" min="100" max="599" value="200" required />
+              </label>
+            </div>
+            <div class="form-grid">
+              <label>Timeout (ms)
+                <input name="timeoutMs" type="number" min="1" value="3000" required />
+              </label>
+              <label>Interval (sec)
+                <input name="intervalSeconds" type="number" min="1" value="60" required />
+              </label>
+            </div>
+            <label>Latency threshold (ms, optional)
+              <input name="latencyThresholdMs" type="number" min="1" placeholder="e.g. 500 — over this becomes DEGRADED" />
+            </label>
+            <label>Owner email
+              <input name="ownerEmail" type="email" maxlength="255" placeholder="oncall@example.com" />
+            </label>
+            <button type="submit" class="btn btn-primary btn-wide">Create</button>
+          </form>
+        </section>
+      </aside>
+    </div>
+
+    <section class="panel detail-panel" id="detailPanel" hidden aria-labelledby="detailHeading">
+      <div class="panel-head">
+        <h2 id="detailHeading">Check history</h2>
+        <p class="panel-sub" id="detailSub"></p>
+      </div>
+      <div class="summary-strip" id="detailSummary" hidden></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Success</th>
+              <th>HTTP</th>
+              <th>Latency</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody id="checksBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span id="lastRefresh">Not refreshed yet</span>
+    <span>Auto-refresh every 15s</span>
+  </footer>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

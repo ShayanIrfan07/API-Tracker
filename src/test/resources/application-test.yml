@@ -1,0 +1,47 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:api_tracker;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+  autoconfigure:
+    exclude: org.springframework.boot.mail.autoconfigure.MailSenderAutoConfiguration
+
+app:
+  security:
+    api-key:
+    require-api-key: false
+    admin-username: admin
+    admin-password: admin
+    jwt-secret: test-secret-key-which-is-long-enough-01
+    jwt-expiration-ms: 3600000
+  rate-limit:
+    enabled: false
+    api-permits-per-minute: 1000
+    login-permits-per-minute: 1000
+    check-now-permits-per-minute: 1000
+  check:
+    scheduler-enabled: false
+    tick-ms: 5000
+    pool-core-size: 2
+    pool-max-size: 4
+    pool-queue-capacity: 10
+    error-message-max-length: 200
+    retention-enabled: false
+    retention-days: 30
+  mail:
+    enabled: false
+    from: noreply@test.local
+  jira:
+    enabled: false
+    base-url:
+    username:
+    api-token:
+    project-key:
+    issue-type: Bug
+    priority: High

@@ -1,0 +1,93 @@
+spring:
+  application:
+    name: api-tracker
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/api_tracker}
+    username: ${DB_USERNAME:api_tracker}
+    password: ${DB_PASSWORD:api_tracker}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:false}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+  health:
+    mail:
+      # Follows MAIL_ENABLED so unused/misconfigured SMTP does not mark health DOWN
+      enabled: ${MAIL_ENABLED:true}
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+server:
+  port: ${SERVER_PORT:8080}
+
+logging:
+  level:
+    root: INFO
+    com.apitracker: INFO
+    org.springframework.security: INFO
+
+app:
+  security:
+    api-key: ${API_TRACKER_API_KEY:}
+    require-api-key: ${REQUIRE_API_KEY:false}
+    admin-username: ${ADMIN_USERNAME:admin}
+    admin-password: ${ADMIN_PASSWORD:admin}
+    jwt-secret: ${JWT_SECRET:change-me-to-a-long-random-secret-key-32b}
+    jwt-expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    api-permits-per-minute: ${RATE_LIMIT_API_PER_MIN:120}
+    login-permits-per-minute: ${RATE_LIMIT_LOGIN_PER_MIN:20}
+    check-now-permits-per-minute: ${RATE_LIMIT_CHECK_NOW_PER_MIN:30}
+  check:
+    scheduler-enabled: ${CHECK_SCHEDULER_ENABLED:true}
+    tick-ms: ${CHECK_TICK_MS:5000}
+    pool-core-size: ${CHECK_POOL_CORE_SIZE:8}
+    pool-max-size: ${CHECK_POOL_MAX_SIZE:32}
+    pool-queue-capacity: ${CHECK_POOL_QUEUE_CAPACITY:200}
+    error-message-max-length: 1000
+    retention-enabled: ${CHECK_RETENTION_ENABLED:true}
+    retention-days: ${CHECK_RETENTION_DAYS:30}
+    retention-cron: ${CHECK_RETENTION_CRON:0 30 2 * * *}
+  mail:
+    enabled: ${MAIL_ENABLED:true}
+    from: ${MAIL_FROM:noreply@apitracker.local}
+  jira:
+    enabled: ${JIRA_ENABLED:false}
+    base-url: ${JIRA_BASE_URL:}
+    username: ${JIRA_USERNAME:}
+    api-token: ${JIRA_API_TOKEN:}
+    project-key: ${JIRA_PROJECT_KEY:}
+    issue-type: ${JIRA_ISSUE_TYPE:Bug}
+    priority: ${JIRA_PRIORITY:High}
