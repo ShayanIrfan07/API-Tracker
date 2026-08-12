@@ -39,21 +39,23 @@ See `.env.example` for configuration. Do not commit real secrets.
 
 ### Deploy on Render (free tier)
 
-**Option A — Blueprint (fastest)**
+Render allows **only one free PostgreSQL database** per account. Reuse an existing database or delete an unused one before creating a new DB.
 
-1. Go to [render.com](https://render.com) → sign in with **GitHub**
-2. **New** → **Blueprint**
-3. Connect repo **`ShayanIrfan07/API-Tracker`**
-4. Render reads `render.yaml` and creates:
-   - Free **PostgreSQL** database
-   - Free **Web Service** (Docker) with `DATABASE_URL` linked
-5. Review generated secrets (`JWT_SECRET`, `ADMIN_PASSWORD`, `API_TRACKER_API_KEY`) in the web service **Environment** tab
-6. Wait for deploy to finish → open the `*.onrender.com` URL
-7. Log in: username `admin`, password = generated `ADMIN_PASSWORD` (copy from Render env vars)
+**Option A — Blueprint (web service only)**
+
+1. In Render, open an existing **PostgreSQL** service → **Connections** → copy the **Internal Database URL**
+   - If you have no Postgres yet: **New** → **PostgreSQL** (Free) first, then copy that URL
+2. **New** → **Blueprint** → connect **`ShayanIrfan07/API-Tracker`**
+3. When prompted for **`DATABASE_URL`**, paste the **Internal Database URL** from step 1
+4. Apply the Blueprint (creates the Docker web service only)
+5. Copy generated secrets from **Environment**: `ADMIN_PASSWORD`, `API_TRACKER_API_KEY`
+6. Open your `*.onrender.com` URL → log in as `admin`
+
+If a previous Blueprint sync failed, open the Blueprint → **Manual sync** after pulling the latest `render.yaml`.
 
 **Option B — Manual setup**
 
-1. **New** → **PostgreSQL** (Free) → note the **Internal Database URL**
+1. Use an existing **PostgreSQL** (Free) or create one if your account has no free DB yet → copy **Internal Database URL**
 2. **New** → **Web Service** → connect GitHub repo `API-Tracker`
 3. Settings:
    - **Runtime:** Docker
@@ -76,9 +78,10 @@ See `.env.example` for configuration. Do not commit real secrets.
 
 **Free tier notes**
 
+- **One free Postgres per account** — Blueprint does not create a database; paste your existing Internal Database URL
 - Web service may **sleep after ~15 minutes** of no traffic; first request after sleep can take 30–60s
 - Free Postgres may have storage/time limits — check [Render pricing](https://render.com/pricing)
-- `PORT` and `DATABASE_URL` are set by Render; the app maps them automatically
+- `PORT` is set by Render; `DATABASE_URL` is mapped to JDBC automatically
 
 Optional email later: `MAIL_ENABLED=true` plus SMTP vars (`MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_SMTP_AUTH=true`, `MAIL_SMTP_STARTTLS=true`).
 
