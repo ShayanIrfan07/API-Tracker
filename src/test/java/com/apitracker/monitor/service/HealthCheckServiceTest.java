@@ -11,7 +11,7 @@ import static org.mockito.Mockito.when;
 import com.apitracker.alert.service.AlertService;
 import com.apitracker.monitor.checker.HttpCheckClient;
 import com.apitracker.monitor.checker.HttpCheckOutcome;
-import com.apitracker.monitor.dto.MonitoredApiResponse;
+import com.apitracker.monitor.dto.CheckNowResponse;
 import com.apitracker.monitor.entity.ApiStatus;
 import com.apitracker.monitor.entity.CheckResult;
 import com.apitracker.monitor.entity.HttpMethod;
@@ -45,9 +45,6 @@ class HealthCheckServiceTest {
 
     @Mock
     private StatusEvaluator statusEvaluator;
-
-    @Mock
-    private MonitoredApiService monitoredApiService;
 
     @Mock
     private AlertService alertService;
@@ -89,7 +86,11 @@ class HealthCheckServiceTest {
     void checkNowPersistsResultEvaluatesAndAlertsOnDown() {
         when(monitoredApiRepository.findById(apiId)).thenReturn(Optional.of(api));
         when(httpCheckClient.check(api)).thenReturn(HttpCheckOutcome.failed(500, 42, "error"));
-        when(checkResultRepository.save(any(CheckResult.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkResultRepository.save(any(CheckResult.class))).thenAnswer(invocation -> {
+            CheckResult saved = invocation.getArgument(0);
+            saved.setId(42L);
+            return saved;
+        });
         when(statusEvaluator.apply(
                         any(MonitoredApi.class),
                         org.mockito.ArgumentMatchers.eq(false),
@@ -100,13 +101,50 @@ class HealthCheckServiceTest {
                     return new EvaluationResult(ApiStatus.UNKNOWN, ApiStatus.DOWN, true);
                 });
         when(monitoredApiRepository.save(api)).thenReturn(api);
-        when(monitoredApiService.toResponse(api)).thenReturn(sampleResponse());
 
-        MonitoredApiResponse response = healthCheckService.checkNow(apiId);
+        CheckNowResponse response = healthCheckService.checkNow(apiId);
 
         verify(alertService).handleTransitionToDown(api);
         verify(monitoringMetrics).recordCheck(false, 42);
-        assertThat(response.id()).isEqualTo(apiId);
+        assertThat(response.apiId()).isEqualTo(apiId);
+        assertThat(response.apiName()).isEqualTo("Payments API");
+        assertThat(response.currentStatus()).isEqualTo(ApiStatus.DOWN);
+        assertThat(response.success()).isFalse();
+        assertThat(response.httpStatus()).isEqualTo(500);
+        assertThat(response.latencyMs()).isEqualTo(42);
+        assertThat(response.errorMessage()).isEqualTo("error");
+        assertThat(response.checkedAt()).isNotNull();
+        assertThat(response.checkResultId()).isEqualTo(42L);
+    }
+
+    @Test
+    void checkNowReturnsCheckOutcomeFieldsOnSuccess() {
+        when(monitoredApiRepository.findById(apiId)).thenReturn(Optional.of(api));
+        when(httpCheckClient.check(api)).thenReturn(HttpCheckOutcome.ok(200, 18));
+        when(checkResultRepository.save(any(CheckResult.class))).thenAnswer(invocation -> {
+            CheckResult saved = invocation.getArgument(0);
+            saved.setId(7L);
+            return saved;
+        });
+        when(statusEvaluator.apply(
+                        any(MonitoredApi.class),
+                        org.mockito.ArgumentMatchers.eq(true),
+                        org.mockito.ArgumentMatchers.eq(18),
+                        any(Instant.class)))
+                .thenAnswer(invocation -> {
+                    api.setCurrentStatus(ApiStatus.UP);
+                    return new EvaluationResult(ApiStatus.UNKNOWN, ApiStatus.UP, true);
+                });
+        when(monitoredApiRepository.save(api)).thenReturn(api);
+
+        CheckNowResponse response = healthCheckService.checkNow(apiId);
+
+        assertThat(response.success()).isTrue();
+        assertThat(response.httpStatus()).isEqualTo(200);
+        assertThat(response.latencyMs()).isEqualTo(18);
+        assertThat(response.timedOut()).isFalse();
+        assertThat(response.errorMessage()).isNull();
+        assertThat(response.currentStatus()).isEqualTo(ApiStatus.UP);
     }
 
     @Test
@@ -120,28 +158,4 @@ class HealthCheckServiceTest {
         healthCheckService.end(apiId);
     }
 
-    private MonitoredApiResponse sampleResponse() {
-        Instant now = Instant.parse("2026-08-08T12:00:00Z");
-        return new MonitoredApiResponse(
-                apiId,
-                "Payments API",
-                "https://api.example.com",
-                "/health",
-                HttpMethod.GET,
-                200,
-                1000,
-                30,
-                3,
-                2,
-                null,
-                "ops@example.com",
-                true,
-                ApiStatus.DOWN,
-                3,
-                0,
-                now,
-                now,
-                now,
-                now);
-    }
 }

@@ -4,8 +4,8 @@ import com.apitracker.alert.service.AlertService;
 import com.apitracker.exception.ResourceNotFoundException;
 import com.apitracker.monitor.checker.HttpCheckClient;
 import com.apitracker.monitor.checker.HttpCheckOutcome;
+import com.apitracker.monitor.dto.CheckNowResponse;
 import com.apitracker.monitor.dto.CheckResultResponse;
-import com.apitracker.monitor.dto.MonitoredApiResponse;
 import com.apitracker.monitor.entity.ApiStatus;
 import com.apitracker.monitor.entity.CheckResult;
 import com.apitracker.monitor.entity.MonitoredApi;
@@ -35,7 +35,6 @@ public class HealthCheckService {
     private final CheckResultRepository checkResultRepository;
     private final HttpCheckClient httpCheckClient;
     private final StatusEvaluator statusEvaluator;
-    private final MonitoredApiService monitoredApiService;
     private final AlertService alertService;
     private final MonitoringMetrics monitoringMetrics;
 
@@ -50,7 +49,7 @@ public class HealthCheckService {
     }
 
     @Transactional
-    public MonitoredApiResponse checkNow(UUID apiId) {
+    public CheckNowResponse checkNow(UUID apiId) {
         if (!tryBegin(apiId)) {
             throw new IllegalStateException("A check is already in progress for API: " + apiId);
         }
@@ -87,7 +86,7 @@ public class HealthCheckService {
                 .map(result -> toCheckResponse(apiId, result));
     }
 
-    private MonitoredApiResponse executeCheck(UUID apiId) {
+    private CheckNowResponse executeCheck(UUID apiId) {
         MonitoredApi api = monitoredApiRepository.findById(apiId)
                 .orElseThrow(() -> new ResourceNotFoundException("MonitoredApi", apiId));
 
@@ -115,7 +114,7 @@ public class HealthCheckService {
                 .apiStatus(api.getCurrentStatus())
                 .timedOut(outcome.timedOut())
                 .build();
-        checkResultRepository.save(result);
+        result = checkResultRepository.save(result);
         checkResultRepository.flush();
 
         monitoredApiRepository.save(api);
@@ -155,7 +154,21 @@ public class HealthCheckService {
                     outcome.errorMessage());
         }
 
-        return monitoredApiService.toResponse(api);
+        return toCheckNowResponse(api, outcome, result);
+    }
+
+    private CheckNowResponse toCheckNowResponse(MonitoredApi api, HttpCheckOutcome outcome, CheckResult result) {
+        return new CheckNowResponse(
+                api.getId(),
+                api.getName(),
+                api.getCurrentStatus(),
+                outcome.success(),
+                outcome.httpStatus(),
+                outcome.latencyMs(),
+                outcome.timedOut(),
+                outcome.errorMessage(),
+                result.getCheckedAt(),
+                result.getId());
     }
 
     private CheckResultResponse toCheckResponse(UUID apiId, CheckResult result) {

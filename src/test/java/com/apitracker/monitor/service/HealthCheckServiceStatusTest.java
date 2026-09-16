@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 import com.apitracker.alert.service.AlertService;
 import com.apitracker.monitor.checker.HttpCheckClient;
 import com.apitracker.monitor.checker.HttpCheckOutcome;
-import com.apitracker.monitor.dto.MonitoredApiResponse;
+import com.apitracker.monitor.dto.CheckNowResponse;
 import com.apitracker.monitor.entity.ApiStatus;
 import com.apitracker.monitor.entity.HttpMethod;
 import com.apitracker.monitor.entity.CheckResult;
@@ -40,9 +40,6 @@ class HealthCheckServiceStatusTest {
     private HttpCheckClient httpCheckClient;
 
     @Mock
-    private MonitoredApiService monitoredApiService;
-
-    @Mock
     private AlertService alertService;
 
     @Mock
@@ -59,7 +56,6 @@ class HealthCheckServiceStatusTest {
                 checkResultRepository,
                 httpCheckClient,
                 new StatusEvaluator(),
-                monitoredApiService,
                 alertService,
                 monitoringMetrics);
 
@@ -90,10 +86,8 @@ class HealthCheckServiceStatusTest {
     void consecutiveFailuresMarkApiDownThroughRealEvaluator() {
         when(monitoredApiRepository.findById(apiId)).thenReturn(Optional.of(api));
         when(httpCheckClient.check(api)).thenReturn(HttpCheckOutcome.failed(null, 50, "Connection refused"));
-        when(checkResultRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkResultRepository.save(any(CheckResult.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(monitoredApiRepository.save(any(MonitoredApi.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(monitoredApiService.toResponse(any(MonitoredApi.class)))
-                .thenAnswer(invocation -> toResponse(invocation.getArgument(0)));
 
         healthCheckService.checkNow(apiId);
         healthCheckService.checkNow(apiId);
@@ -108,8 +102,6 @@ class HealthCheckServiceStatusTest {
         when(httpCheckClient.check(api)).thenReturn(HttpCheckOutcome.ok(200, 250));
         when(checkResultRepository.save(any(CheckResult.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(monitoredApiRepository.save(any(MonitoredApi.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(monitoredApiService.toResponse(any(MonitoredApi.class)))
-                .thenAnswer(invocation -> toResponse(invocation.getArgument(0)));
 
         healthCheckService.checkNow(apiId);
         healthCheckService.checkNow(apiId);
@@ -129,39 +121,16 @@ class HealthCheckServiceStatusTest {
     void slowSuccessfulChecksMarkApiDegradedThroughRealEvaluator() {
         when(monitoredApiRepository.findById(apiId)).thenReturn(Optional.of(api));
         when(httpCheckClient.check(api)).thenReturn(HttpCheckOutcome.ok(200, 250));
-        when(checkResultRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkResultRepository.save(any(CheckResult.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(monitoredApiRepository.save(any(MonitoredApi.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(monitoredApiService.toResponse(any(MonitoredApi.class)))
-                .thenAnswer(invocation -> toResponse(invocation.getArgument(0)));
 
         healthCheckService.checkNow(apiId);
-        MonitoredApiResponse response = healthCheckService.checkNow(apiId);
+        CheckNowResponse response = healthCheckService.checkNow(apiId);
 
         assertThat(api.getCurrentStatus()).isEqualTo(ApiStatus.DEGRADED);
         assertThat(response.currentStatus()).isEqualTo(ApiStatus.DEGRADED);
-    }
-
-    private MonitoredApiResponse toResponse(MonitoredApi entity) {
-        return new MonitoredApiResponse(
-                entity.getId(),
-                entity.getName(),
-                entity.getBaseUrl(),
-                entity.getPath(),
-                entity.getHttpMethod(),
-                entity.getExpectedStatusCode(),
-                entity.getTimeoutMs(),
-                entity.getIntervalSeconds(),
-                entity.getFailureThreshold(),
-                entity.getSuccessThreshold(),
-                entity.getLatencyThresholdMs(),
-                entity.getOwnerEmail(),
-                entity.getEnabled(),
-                entity.getCurrentStatus(),
-                entity.getConsecutiveFailures(),
-                entity.getConsecutiveSuccesses(),
-                entity.getLastCheckedAt(),
-                entity.getLastStatusChangeAt(),
-                entity.getCreatedAt(),
-                entity.getUpdatedAt());
+        assertThat(response.success()).isTrue();
+        assertThat(response.httpStatus()).isEqualTo(200);
+        assertThat(response.latencyMs()).isEqualTo(250);
     }
 }

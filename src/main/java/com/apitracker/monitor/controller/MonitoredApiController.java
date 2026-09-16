@@ -1,6 +1,7 @@
 package com.apitracker.monitor.controller;
 
 import com.apitracker.monitor.dto.ApiUptimeSummaryResponse;
+import com.apitracker.monitor.dto.CheckNowResponse;
 import com.apitracker.monitor.dto.CheckResultResponse;
 import com.apitracker.monitor.dto.CreateMonitoredApiRequest;
 import com.apitracker.monitor.dto.MonitoredApiResponse;
@@ -65,7 +66,7 @@ public class MonitoredApiController {
     }
 
     @PostMapping("/{id}/check-now")
-    public MonitoredApiResponse checkNow(@PathVariable UUID id) {
+    public CheckNowResponse checkNow(@PathVariable UUID id) {
         return healthCheckService.checkNow(id);
     }
 

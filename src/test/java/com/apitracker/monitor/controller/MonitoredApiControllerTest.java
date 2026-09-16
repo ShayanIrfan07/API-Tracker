@@ -13,6 +13,7 @@ import com.apitracker.auth.JwtTokenService;
 import com.apitracker.config.SecurityConfig;
 import com.apitracker.exception.GlobalExceptionHandler;
 import com.apitracker.exception.ResourceNotFoundException;
+import com.apitracker.monitor.dto.CheckNowResponse;
 import com.apitracker.monitor.dto.CheckResultResponse;
 import com.apitracker.monitor.dto.CreateMonitoredApiRequest;
 import com.apitracker.monitor.dto.MonitoredApiResponse;
@@ -199,11 +200,29 @@ class MonitoredApiControllerTest {
     @Test
     void checkNowReturns200() throws Exception {
         UUID id = UUID.randomUUID();
-        when(healthCheckService.checkNow(id)).thenReturn(sampleResponse(id, "/health", true));
+        Instant now = Instant.parse("2026-08-08T10:00:00Z");
+        when(healthCheckService.checkNow(id)).thenReturn(new CheckNowResponse(
+                id,
+                "Orders API",
+                ApiStatus.UP,
+                true,
+                200,
+                15,
+                false,
+                null,
+                now,
+                1L));
 
         mockMvc.perform(post("/api/v1/monitored-apis/{id}/check-now", id))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(id.toString()));
+                .andExpect(jsonPath("$.apiId").value(id.toString()))
+                .andExpect(jsonPath("$.apiName").value("Orders API"))
+                .andExpect(jsonPath("$.currentStatus").value("UP"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.httpStatus").value(200))
+                .andExpect(jsonPath("$.latencyMs").value(15))
+                .andExpect(jsonPath("$.timedOut").value(false))
+                .andExpect(jsonPath("$.checkResultId").value(1));
     }
 
     @Test

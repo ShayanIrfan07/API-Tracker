@@ -333,8 +333,14 @@
 
     try {
       if (action === "check") {
-        await api(`/api/v1/monitored-apis/${id}/check-now`, { method: "POST" });
-        showBanner("Check completed", true);
+        const result = await api(`/api/v1/monitored-apis/${id}/check-now`, { method: "POST" });
+        const http = result.httpStatus ?? "—";
+        const latency = result.latencyMs != null ? `${result.latencyMs} ms` : "—";
+        const detail = result.errorMessage ? ` · ${result.errorMessage}` : "";
+        showBanner(
+          `${result.apiName}: ${result.currentStatus} · HTTP ${http} · ${latency}${detail}`,
+          Boolean(result.success)
+        );
         await refresh();
       } else if (action === "disable") {
         await api(`/api/v1/monitored-apis/${id}`, { method: "DELETE" });
