@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.apitracker.auth.JwtTokenService;
 import com.apitracker.config.SecurityConfig;
+import com.apitracker.exception.ConflictException;
 import com.apitracker.exception.GlobalExceptionHandler;
 import com.apitracker.exception.ResourceNotFoundException;
 import com.apitracker.monitor.dto.CheckNowResponse;
@@ -195,6 +196,43 @@ class MonitoredApiControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.path").value("/ready"));
+    }
+
+    @Test
+    void createReturns409WhenNameAlreadyExists() throws Exception {
+        CreateMonitoredApiRequest request = new CreateMonitoredApiRequest(
+                "Orders API",
+                "https://orders.example.com",
+                "/health",
+                HttpMethod.GET,
+                200,
+                2000,
+                30,
+                3,
+                2,
+                null,
+                "ops@example.com",
+                true);
+
+        when(monitoredApiService.create(any(CreateMonitoredApiRequest.class)))
+                .thenThrow(new ConflictException("An API named 'Orders API' already exists"));
+
+        mockMvc.perform(post("/api/v1/monitored-apis")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("CONFLICT"));
+    }
+
+    @Test
+    void checkNowReturns409WhenCheckAlreadyInProgress() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(healthCheckService.checkNow(id))
+                .thenThrow(new IllegalStateException("A check is already in progress for API: " + id));
+
+        mockMvc.perform(post("/api/v1/monitored-apis/{id}/check-now", id))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("CONFLICT"));
     }
 
     @Test

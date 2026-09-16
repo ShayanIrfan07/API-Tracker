@@ -92,6 +92,18 @@ class HttpCheckClientTest {
     }
 
     @Test
+    void returnsFailureOnConnectionRefused() {
+        MonitoredApi api = sampleApi(HttpMethod.GET, "/missing", 200, 1000);
+        api.setBaseUrl("http://127.0.0.1:1");
+
+        HttpCheckOutcome outcome = client.check(api);
+
+        assertThat(outcome.success()).isFalse();
+        assertThat(outcome.httpStatus()).isNull();
+        assertThat(outcome.errorMessage()).isNotBlank();
+    }
+
+    @Test
     void blocksLoopbackTargetWhenSsrfProtectionEnabled() {
         HttpCheckClient protectedClient = new HttpCheckClient(new CheckProperties(
                 false,

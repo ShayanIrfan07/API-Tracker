@@ -118,6 +118,24 @@ class HealthCheckServiceStatusTest {
     }
 
     @Test
+    void recoveryFromDownClosesIncident() {
+        api.setCurrentStatus(ApiStatus.DOWN);
+        api.setConsecutiveFailures(2);
+        api.setConsecutiveSuccesses(0);
+
+        when(monitoredApiRepository.findById(apiId)).thenReturn(Optional.of(api));
+        when(httpCheckClient.check(api)).thenReturn(HttpCheckOutcome.ok(200, 20));
+        when(checkResultRepository.save(any(CheckResult.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(monitoredApiRepository.save(any(MonitoredApi.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        healthCheckService.checkNow(apiId);
+        healthCheckService.checkNow(apiId);
+
+        assertThat(api.getCurrentStatus()).isEqualTo(ApiStatus.UP);
+        verify(alertService).handleTransitionToUp(api);
+    }
+
+    @Test
     void slowSuccessfulChecksMarkApiDegradedThroughRealEvaluator() {
         when(monitoredApiRepository.findById(apiId)).thenReturn(Optional.of(api));
         when(httpCheckClient.check(api)).thenReturn(HttpCheckOutcome.ok(200, 250));
