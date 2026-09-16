@@ -1,58 +1,138 @@
 services:
+
   postgres:
     image: postgres:16-alpine
     container_name: api-tracker-postgres
+
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-api_tracker}
       POSTGRES_USER: ${POSTGRES_USER:-api_tracker}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-api_tracker}
+
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
+
     volumes:
       - api_tracker_pgdata:/var/lib/postgresql/data
+
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 10
 
+
   mailpit:
     image: axllent/mailpit:v1.22
     container_name: api-tracker-mailpit
+
     ports:
       - "${MAILPIT_SMTP_PORT:-1025}:1025"
       - "${MAILPIT_UI_PORT:-8025}:8025"
+
     restart: unless-stopped
+
 
   app:
     image: ${API_TRACKER_IMAGE:-ghcr.io/shayanirfan07/api-tracker:latest}
     container_name: api-tracker-app
+
     depends_on:
       postgres:
         condition: service_healthy
       mailpit:
         condition: service_started
+
     ports:
-      - "${SERVER_PORT:-8080}:8080"
+      - "${SERVER_PORT:-8081}:8080"
+
     environment:
+
+      # =========================
+      # Database
+      # =========================
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-api_tracker}
       DB_USERNAME: ${POSTGRES_USER:-api_tracker}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-api_tracker}
+
+      # =========================
+      # Server
+      # =========================
+      # Spring application.yml:
+      # server:
+      #   port: ${PORT:${SERVER_PORT:8080}}
+      #
+      # Explicitly force the application to use 8080
+      # inside the Docker container.
+      PORT: 8080
       SERVER_PORT: 8080
+
+      # =========================
+      # Mail
+      # =========================
       MAIL_ENABLED: ${MAIL_ENABLED:-true}
+      MAIL_PROVIDER: ${MAIL_PROVIDER:-mailpit}
+
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
+
       MAIL_SMTP_AUTH: "false"
       MAIL_SMTP_STARTTLS: "false"
+
       MAIL_FROM: ${MAIL_FROM:-noreply@apitracker.local}
+
+      # =========================
+      # Brevo
+      # =========================
+      BREVO_API_URL: ${BREVO_API_URL:-https://api.brevo.com/v3/smtp/email}
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+
+      # =========================
+      # API Key Security
+      # =========================
       API_TRACKER_API_KEY: ${API_TRACKER_API_KEY:-}
       REQUIRE_API_KEY: ${REQUIRE_API_KEY:-false}
+
+      # =========================
+      # Admin Authentication
+      # =========================
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
-      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-secret-key-32b}
+
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-secret-key-32}
+
+      # =========================
+      # Rate Limiting
+      # =========================
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
-    profiles: ["app"]
+
+      # =========================
+      # Monitoring Scheduler
+      # =========================
+      CHECK_SCHEDULER_ENABLED: ${CHECK_SCHEDULER_ENABLED:-true}
+      CHECK_TICK_MS: ${CHECK_TICK_MS:-5000}
+
+      CHECK_POOL_CORE_SIZE: ${CHECK_POOL_CORE_SIZE:-8}
+      CHECK_POOL_MAX_SIZE: ${CHECK_POOL_MAX_SIZE:-32}
+      CHECK_POOL_QUEUE_CAPACITY: ${CHECK_POOL_QUEUE_CAPACITY:-200}
+
+      # =========================
+      # Check Retention
+      # =========================
+      CHECK_RETENTION_ENABLED: ${CHECK_RETENTION_ENABLED:-true}
+      CHECK_RETENTION_DAYS: ${CHECK_RETENTION_DAYS:-30}
+      CHECK_RETENTION_CRON: ${CHECK_RETENTION_CRON:-0 30 2 * * *}
+
+      # =========================
+      # SSRF Protection
+      # =========================
+      CHECK_SSRF_PROTECTION_ENABLED: ${CHECK_SSRF_PROTECTION_ENABLED:-true}
+
+    profiles:
+      - app
+
     restart: unless-stopped
+
 
 volumes:
   api_tracker_pgdata:
