@@ -89,6 +89,8 @@ class AlertServiceTest {
                         .monitoredApi(api)
                         .checkedAt(Instant.parse("2026-08-08T12:00:00Z"))
                         .success(false)
+                        .apiStatus(ApiStatus.DOWN)
+                        .timedOut(false)
                         .httpStatus(500)
                         .latencyMs(20)
                         .errorMessage("boom")

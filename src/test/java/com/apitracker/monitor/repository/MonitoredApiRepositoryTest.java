@@ -59,6 +59,8 @@ class MonitoredApiRepositoryTest {
                 .monitoredApi(api)
                 .checkedAt(Instant.parse("2026-08-08T10:00:00Z"))
                 .success(true)
+                .apiStatus(ApiStatus.UP)
+                .timedOut(false)
                 .httpStatus(200)
                 .latencyMs(12)
                 .build());
@@ -66,6 +68,8 @@ class MonitoredApiRepositoryTest {
                 .monitoredApi(api)
                 .checkedAt(Instant.parse("2026-08-08T10:01:00Z"))
                 .success(false)
+                .apiStatus(ApiStatus.DOWN)
+                .timedOut(false)
                 .httpStatus(500)
                 .latencyMs(20)
                 .errorMessage("Unexpected status code")

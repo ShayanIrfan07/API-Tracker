@@ -102,6 +102,9 @@ public class HealthCheckService {
         HttpCheckOutcome outcome = httpCheckClient.check(api);
         Instant checkedAt = Instant.now();
 
+        EvaluationResult evaluation = statusEvaluator.apply(
+                api, outcome.success(), outcome.latencyMs(), checkedAt);
+
         CheckResult result = CheckResult.builder()
                 .monitoredApi(api)
                 .checkedAt(checkedAt)
@@ -109,12 +112,12 @@ public class HealthCheckService {
                 .httpStatus(outcome.httpStatus())
                 .latencyMs(outcome.latencyMs())
                 .errorMessage(outcome.errorMessage())
+                .apiStatus(api.getCurrentStatus())
+                .timedOut(outcome.timedOut())
                 .build();
         checkResultRepository.save(result);
         checkResultRepository.flush();
 
-        EvaluationResult evaluation = statusEvaluator.apply(
-                api, outcome.success(), outcome.latencyMs(), checkedAt);
         monitoredApiRepository.save(api);
         monitoredApiRepository.flush();
 
@@ -161,8 +164,10 @@ public class HealthCheckService {
                 apiId,
                 result.getCheckedAt(),
                 result.getSuccess(),
+                result.getApiStatus(),
                 result.getHttpStatus(),
                 result.getLatencyMs(),
+                result.getTimedOut(),
                 result.getErrorMessage());
     }
 }

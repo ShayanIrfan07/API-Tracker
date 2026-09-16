@@ -2,6 +2,8 @@ package com.apitracker.monitor.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -47,4 +49,11 @@ public class CheckResult {
 
     @Column(name = "error_message")
     private String errorMessage;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "api_status", nullable = false, length = 16)
+    private ApiStatus apiStatus;
+
+    @Column(name = "timed_out", nullable = false)
+    private Boolean timedOut;
 }

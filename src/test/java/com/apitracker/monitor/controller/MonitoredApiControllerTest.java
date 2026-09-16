@@ -212,7 +212,7 @@ class MonitoredApiControllerTest {
         Instant now = Instant.parse("2026-08-08T10:00:00Z");
         when(healthCheckService.getCheckHistory(eq(id), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(
-                        new CheckResultResponse(1L, id, now, true, 200, 15, null))));
+                        new CheckResultResponse(1L, id, now, true, ApiStatus.UP, 200, 15, false, null))));
 
         mockMvc.perform(get("/api/v1/monitored-apis/{id}/checks", id))
                 .andExpect(status().isOk())

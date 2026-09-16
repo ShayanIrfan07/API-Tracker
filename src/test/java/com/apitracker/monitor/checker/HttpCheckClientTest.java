@@ -86,6 +86,7 @@ class HttpCheckClientTest {
         HttpCheckOutcome outcome = client.check(sampleApi(HttpMethod.GET, "/slow", 200, 100));
 
         assertThat(outcome.success()).isFalse();
+        assertThat(outcome.timedOut()).isTrue();
         assertThat(outcome.errorMessage()).isNotBlank();
     }
 

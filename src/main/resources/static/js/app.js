@@ -210,7 +210,7 @@
       els.detailSummary.innerHTML = "";
     }
     if (!rows.length) {
-      els.checksBody.innerHTML = `<tr><td colspan="5" class="empty">No checks recorded yet.</td></tr>`;
+      els.checksBody.innerHTML = `<tr><td colspan="7" class="empty">No checks recorded yet.</td></tr>`;
       return;
     }
     els.checksBody.innerHTML = rows
@@ -219,8 +219,10 @@
         <tr>
           <td>${escapeHtml(formatTime(row.checkedAt))}</td>
           <td>${row.success ? "yes" : "no"}</td>
+          <td>${escapeHtml(row.apiStatus || "—")}</td>
           <td>${row.httpStatus ?? "—"}</td>
           <td>${row.latencyMs ?? "—"} ms</td>
+          <td>${row.timedOut ? "yes" : "no"}</td>
           <td class="endpoint">${escapeHtml(row.errorMessage || "—")}</td>
         </tr>`
       )

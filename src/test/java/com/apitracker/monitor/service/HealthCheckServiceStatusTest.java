@@ -11,6 +11,7 @@ import com.apitracker.monitor.checker.HttpCheckOutcome;
 import com.apitracker.monitor.dto.MonitoredApiResponse;
 import com.apitracker.monitor.entity.ApiStatus;
 import com.apitracker.monitor.entity.HttpMethod;
+import com.apitracker.monitor.entity.CheckResult;
 import com.apitracker.monitor.entity.MonitoredApi;
 import com.apitracker.monitor.evaluation.StatusEvaluator;
 import com.apitracker.monitor.metrics.MonitoringMetrics;
@@ -22,6 +23,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -98,6 +100,29 @@ class HealthCheckServiceStatusTest {
 
         assertThat(api.getCurrentStatus()).isEqualTo(ApiStatus.DOWN);
         verify(alertService).handleTransitionToDown(api);
+    }
+
+    @Test
+    void persistsEvaluatedStatusOnCheckResult() {
+        when(monitoredApiRepository.findById(apiId)).thenReturn(Optional.of(api));
+        when(httpCheckClient.check(api)).thenReturn(HttpCheckOutcome.ok(200, 250));
+        when(checkResultRepository.save(any(CheckResult.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(monitoredApiRepository.save(any(MonitoredApi.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(monitoredApiService.toResponse(any(MonitoredApi.class)))
+                .thenAnswer(invocation -> toResponse(invocation.getArgument(0)));
+
+        healthCheckService.checkNow(apiId);
+        healthCheckService.checkNow(apiId);
+
+        ArgumentCaptor<CheckResult> captor = ArgumentCaptor.forClass(CheckResult.class);
+        verify(checkResultRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+        CheckResult lastSaved = captor.getAllValues().get(1);
+
+        assertThat(lastSaved.getApiStatus()).isEqualTo(ApiStatus.DEGRADED);
+        assertThat(lastSaved.getSuccess()).isTrue();
+        assertThat(lastSaved.getHttpStatus()).isEqualTo(200);
+        assertThat(lastSaved.getTimedOut()).isFalse();
+        assertThat(lastSaved.getLatencyMs()).isEqualTo(250);
     }
 
     @Test
