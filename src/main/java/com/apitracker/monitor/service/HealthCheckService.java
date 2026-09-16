@@ -91,6 +91,13 @@ public class HealthCheckService {
         MonitoredApi api = monitoredApiRepository.findById(apiId)
                 .orElseThrow(() -> new ResourceNotFoundException("MonitoredApi", apiId));
 
+        log.debug("Executing HTTP check apiId={} name='{}' method={} url={}{}",
+                api.getId(),
+                api.getName(),
+                api.getHttpMethod(),
+                api.getBaseUrl(),
+                api.getPath());
+
         Instant started = Instant.now();
         HttpCheckOutcome outcome = httpCheckClient.check(api);
         Instant checkedAt = Instant.now();
@@ -126,14 +133,24 @@ public class HealthCheckService {
             }
         }
 
-        log.info(
-                "Checked apiId={} name='{}' success={} status={} httpStatus={} latencyMs={}",
-                api.getId(),
-                api.getName(),
-                outcome.success(),
-                api.getCurrentStatus(),
-                outcome.httpStatus(),
-                outcome.latencyMs());
+        if (outcome.success()) {
+            log.info(
+                    "API check completed apiId={} name='{}' status={} httpStatus={} latencyMs={}",
+                    api.getId(),
+                    api.getName(),
+                    api.getCurrentStatus(),
+                    outcome.httpStatus(),
+                    outcome.latencyMs());
+        } else {
+            log.warn(
+                    "API check failed apiId={} name='{}' status={} httpStatus={} latencyMs={} error={}",
+                    api.getId(),
+                    api.getName(),
+                    api.getCurrentStatus(),
+                    outcome.httpStatus(),
+                    outcome.latencyMs(),
+                    outcome.errorMessage());
+        }
 
         return monitoredApiService.toResponse(api);
     }

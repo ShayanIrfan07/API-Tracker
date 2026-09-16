@@ -7,6 +7,7 @@ import com.apitracker.monitor.repository.MonitoredApiRepository;
 import com.apitracker.monitor.service.HealthCheckService;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -48,9 +49,14 @@ public class ScheduledCheckRunner {
             return;
         }
 
-        log.debug("Scheduler found {} due API(s)", dueApis.size());
+        log.info("Scheduler dispatching {} due API check(s)", dueApis.size());
         for (MonitoredApi api : dueApis) {
-            checkTaskExecutor.execute(() -> healthCheckService.runScheduledCheck(api.getId()));
+            UUID apiId = api.getId();
+            String apiName = api.getName();
+            checkTaskExecutor.execute(() -> {
+                log.info("API check started apiId={} name='{}'", apiId, apiName);
+                healthCheckService.runScheduledCheck(apiId);
+            });
         }
     }
 
