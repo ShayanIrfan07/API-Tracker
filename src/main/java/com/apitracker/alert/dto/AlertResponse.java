@@ -14,6 +14,8 @@ public record AlertResponse(
         String jiraIssueKey,
         String jiraIssueUrl,
         String summary,
-        String detail
+        String detail,
+        String failureReason,
+        Long durationSeconds
 ) {
 }

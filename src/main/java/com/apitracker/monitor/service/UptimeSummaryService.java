@@ -1,5 +1,7 @@
 package com.apitracker.monitor.service;
 
+import com.apitracker.alert.entity.AlertStatus;
+import com.apitracker.alert.repository.AlertRepository;
 import com.apitracker.exception.ResourceNotFoundException;
 import com.apitracker.monitor.dto.ApiUptimeSummaryResponse;
 import com.apitracker.monitor.dto.FleetSummaryResponse;
@@ -30,6 +32,7 @@ public class UptimeSummaryService {
 
     private final MonitoredApiRepository monitoredApiRepository;
     private final CheckResultRepository checkResultRepository;
+    private final AlertRepository alertRepository;
 
     public ApiUptimeSummaryResponse summarizeApi(UUID apiId, int hours) {
         int windowHours = normalizeHours(hours);
@@ -103,6 +106,11 @@ public class UptimeSummaryService {
                 ? null
                 : round1(latencyWeightedSum / latencySamples);
 
+        long openIncidents = alertRepository.countByStatus(AlertStatus.OPEN);
+        long resolvedIncidents = alertRepository.countByStatusAndResolvedAtGreaterThanEqual(
+                AlertStatus.RESOLVED, windowStart);
+        Double mttrSeconds = roundMttr(alertRepository.averageDurationSecondsSince(windowStart));
+
         return new FleetSummaryResponse(
                 windowHours,
                 windowStart,
@@ -117,6 +125,9 @@ public class UptimeSummaryService {
                 successfulChecks,
                 fleetUptime,
                 fleetAvgLatency,
+                openIncidents,
+                resolvedIncidents,
+                mttrSeconds,
                 apiSummaries
         );
     }
@@ -172,5 +183,12 @@ public class UptimeSummaryService {
 
     private static double round1(double value) {
         return Math.round(value * 10.0) / 10.0;
+    }
+
+    private static Double roundMttr(Double seconds) {
+        if (seconds == null) {
+            return null;
+        }
+        return round1(seconds);
     }
 }

@@ -55,6 +55,12 @@ public class Alert {
     @Column(columnDefinition = "TEXT")
     private String detail;
 
+    @Column(name = "failure_reason", length = 500)
+    private String failureReason;
+
+    @Column(name = "duration_seconds")
+    private Long durationSeconds;
+
     @PrePersist
     void onCreate() {
         if (id == null) {

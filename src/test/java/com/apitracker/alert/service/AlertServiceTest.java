@@ -111,6 +111,30 @@ class AlertServiceTest {
         assertThat(saved.getStatus()).isEqualTo(AlertStatus.OPEN);
         assertThat(saved.getSummary()).contains("DOWN");
         assertThat(saved.getJiraIssueKey()).isEqualTo("OPS-42");
+        assertThat(saved.getFailureReason()).isEqualTo("Unexpected HTTP status 500 (expected 200)");
+    }
+
+    @Test
+    void capturesTimeoutAsFailureReason() {
+        when(alertRepository.findByMonitoredApiIdAndStatus(api.getId(), AlertStatus.OPEN))
+                .thenReturn(Optional.empty());
+        when(checkResultRepository.findByMonitoredApiIdOrderByCheckedAtDesc(any(UUID.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(CheckResult.builder()
+                        .monitoredApi(api)
+                        .checkedAt(Instant.parse("2026-08-08T12:00:00Z"))
+                        .success(false)
+                        .apiStatus(ApiStatus.DOWN)
+                        .timedOut(true)
+                        .latencyMs(1000)
+                        .build())));
+        when(alertRepository.save(any(Alert.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        alertService.handleTransitionToDown(api);
+
+        ArgumentCaptor<Alert> alertCaptor = ArgumentCaptor.forClass(Alert.class);
+        verify(alertRepository).save(alertCaptor.capture());
+        assertThat(alertCaptor.getValue().getFailureReason())
+                .isEqualTo("Request timed out after 1000 ms");
     }
 
     @Test
@@ -174,8 +198,10 @@ class AlertServiceTest {
 
         assertThat(existing.getStatus()).isEqualTo(AlertStatus.RESOLVED);
         assertThat(existing.getResolvedAt()).isNotNull();
+        assertThat(existing.getDurationSeconds()).isNotNull().isPositive();
         verify(jiraTicketService).commentRecovery("OPS-1", api, existing);
         verify(emailNotificationService).sendRecovered(api, existing);
+        verify(monitoringMetrics).recordAlertResolved(existing.getDurationSeconds());
         verify(jiraTicketService, never()).createIssue(any(), any());
     }
 }

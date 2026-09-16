@@ -12,6 +12,7 @@ import com.apitracker.monitor.entity.MonitoredApi;
 import com.apitracker.monitor.metrics.MonitoringMetrics;
 import com.apitracker.monitor.repository.CheckResultRepository;
 import com.apitracker.notification.service.EmailNotificationService;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -51,6 +52,7 @@ public class AlertService {
         }
 
         String detail = buildFailureDetail(api);
+        String failureReason = extractFailureReason(api);
         Alert alert = Alert.builder()
                 .id(UUID.randomUUID())
                 .monitoredApi(api)
@@ -58,6 +60,7 @@ public class AlertService {
                 .openedAt(Instant.now())
                 .summary("[API Tracker] " + api.getName() + " is DOWN")
                 .detail(detail)
+                .failureReason(failureReason)
                 .build();
         alertRepository.save(alert);
         alertRepository.flush();
@@ -69,7 +72,12 @@ public class AlertService {
 
         emailNotificationService.sendDown(api, alert);
         monitoringMetrics.recordAlertOpened();
-        log.info("Opened alert {} for apiId={}", alert.getId(), api.getId());
+        log.info(
+                "Incident opened alertId={} apiId={} apiName='{}' failureReason='{}'",
+                alert.getId(),
+                api.getId(),
+                api.getName(),
+                failureReason);
     }
 
     public void handleTransitionToUp(MonitoredApi api) {
@@ -80,14 +88,24 @@ public class AlertService {
         }
 
         Alert alert = existingOpen.get();
+        Instant resolvedAt = Instant.now();
         alert.setStatus(AlertStatus.RESOLVED);
-        alert.setResolvedAt(Instant.now());
+        alert.setResolvedAt(resolvedAt);
+        if (alert.getOpenedAt() != null) {
+            alert.setDurationSeconds(Duration.between(alert.getOpenedAt(), resolvedAt).getSeconds());
+        }
         alertRepository.save(alert);
         alertRepository.flush();
 
         jiraTicketService.commentRecovery(alert.getJiraIssueKey(), api, alert);
         emailNotificationService.sendRecovered(api, alert);
-        log.info("Resolved alert {} for apiId={}", alert.getId(), api.getId());
+        monitoringMetrics.recordAlertResolved(alert.getDurationSeconds());
+        log.info(
+                "Incident recovered alertId={} apiId={} apiName='{}' durationSeconds={}",
+                alert.getId(),
+                api.getId(),
+                api.getName(),
+                alert.getDurationSeconds());
     }
 
     @Transactional(readOnly = true)
@@ -102,6 +120,28 @@ public class AlertService {
     public AlertResponse findById(UUID id) {
         return toResponse(alertRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Alert", id)));
+    }
+
+    private String extractFailureReason(MonitoredApi api) {
+        List<CheckResult> recent = checkResultRepository
+                .findByMonitoredApiIdOrderByCheckedAtDesc(api.getId(), PageRequest.of(0, 1))
+                .getContent();
+        if (recent.isEmpty()) {
+            return "Repeated check failures (no check results available)";
+        }
+
+        CheckResult latest = recent.getFirst();
+        if (Boolean.TRUE.equals(latest.getTimedOut())) {
+            return "Request timed out after " + api.getTimeoutMs() + " ms";
+        }
+        if (latest.getHttpStatus() != null && !latest.getHttpStatus().equals(api.getExpectedStatusCode())) {
+            return "Unexpected HTTP status " + latest.getHttpStatus()
+                    + " (expected " + api.getExpectedStatusCode() + ")";
+        }
+        if (latest.getErrorMessage() != null && !latest.getErrorMessage().isBlank()) {
+            return latest.getErrorMessage();
+        }
+        return "Repeated check failures";
     }
 
     private String buildFailureDetail(MonitoredApi api) {
@@ -135,6 +175,8 @@ public class AlertService {
                 key,
                 jiraProperties.browseUrl(key).orElse(null),
                 alert.getSummary(),
-                alert.getDetail());
+                alert.getDetail(),
+                alert.getFailureReason(),
+                alert.getDurationSeconds());
     }
 }

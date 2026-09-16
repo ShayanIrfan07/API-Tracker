@@ -31,6 +31,7 @@ public class EmailNotificationService {
                 API: %s
                 URL: %s%s
                 Opened at: %s
+                Failure reason: %s
                 Jira: %s
 
                 Details:
@@ -40,6 +41,7 @@ public class EmailNotificationService {
                 api.getBaseUrl(),
                 api.getPath(),
                 alert.getOpenedAt(),
+                alert.getFailureReason() == null ? "(unknown)" : alert.getFailureReason(),
                 alert.getJiraIssueKey() == null ? "(not created)" : alert.getJiraIssueKey(),
                 alert.getDetail() == null ? "(none)" : alert.getDetail());
         send(api, alert, subject, body);
@@ -54,6 +56,7 @@ public class EmailNotificationService {
                 URL: %s%s
                 Opened at: %s
                 Resolved at: %s
+                Duration: %s
                 Jira: %s
 
                 The API is UP again. The Jira issue was commented on but not auto-closed.
@@ -63,6 +66,7 @@ public class EmailNotificationService {
                 api.getPath(),
                 alert.getOpenedAt(),
                 alert.getResolvedAt(),
+                formatDuration(alert.getDurationSeconds()),
                 alert.getJiraIssueKey() == null ? "(not created)" : alert.getJiraIssueKey());
         send(api, alert, subject, body);
     }
@@ -101,6 +105,18 @@ public class EmailNotificationService {
             log.error("Failed to send email for alert {} to {}: {}", alert.getId(), recipient, ex.getMessage());
             saveLog(alert, recipient, false, ex.getMessage());
         }
+    }
+
+    private static String formatDuration(Long durationSeconds) {
+        if (durationSeconds == null) {
+            return "(unknown)";
+        }
+        if (durationSeconds < 60) {
+            return durationSeconds + "s";
+        }
+        long minutes = durationSeconds / 60;
+        long seconds = durationSeconds % 60;
+        return seconds == 0 ? minutes + "m" : minutes + "m " + seconds + "s";
     }
 
     private void saveLog(Alert alert, String recipient, boolean success, String errorMessage) {

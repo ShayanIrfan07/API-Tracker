@@ -30,6 +30,7 @@
     metricAlerts: document.getElementById("metricAlerts"),
     metricUptime: document.getElementById("metricUptime"),
     metricLatency: document.getElementById("metricLatency"),
+    metricMttr: document.getElementById("metricMttr"),
     detailSummary: document.getElementById("detailSummary"),
   };
 
@@ -132,6 +133,15 @@
     return `${Math.round(Number(value))} ms`;
   }
 
+  function formatDurationSeconds(value) {
+    if (value == null || Number.isNaN(value)) return "—";
+    const total = Math.round(Number(value));
+    if (total < 60) return `${total}s`;
+    const minutes = Math.floor(total / 60);
+    const seconds = total % 60;
+    return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+  }
+
   function renderApis(apis, summaryById) {
     if (!apis.length) {
       els.apisBody.innerHTML = `<tr><td colspan="7" class="empty">No APIs registered yet.</td></tr>`;
@@ -180,6 +190,7 @@
         <li class="alert-item">
           <strong>${escapeHtml(alert.summary)}</strong>
           <span>${escapeHtml(alert.apiName)} · opened ${escapeHtml(formatTime(alert.openedAt))}</span>
+          ${alert.failureReason ? `<span class="endpoint">${escapeHtml(alert.failureReason)}</span>` : ""}
           ${alert.jiraIssueKey
             ? `<span>Jira ${
                 alert.jiraIssueUrl
@@ -237,6 +248,7 @@
     els.metricAlerts.textContent = String(alerts.length);
     els.metricUptime.textContent = formatPercent(fleet?.fleetUptimePercent);
     els.metricLatency.textContent = formatLatency(fleet?.fleetAvgLatencyMs);
+    els.metricMttr.textContent = formatDurationSeconds(fleet?.mttrSeconds);
   }
 
   async function refresh() {

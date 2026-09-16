@@ -5,6 +5,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+import com.apitracker.alert.entity.AlertStatus;
+import com.apitracker.alert.repository.AlertRepository;
 import com.apitracker.monitor.dto.ApiUptimeSummaryResponse;
 import com.apitracker.monitor.dto.FleetSummaryResponse;
 import com.apitracker.monitor.entity.ApiStatus;
@@ -33,6 +35,9 @@ class UptimeSummaryServiceTest {
 
     @Mock
     private CheckResultRepository checkResultRepository;
+
+    @Mock
+    private AlertRepository alertRepository;
 
     @InjectMocks
     private UptimeSummaryService uptimeSummaryService;
@@ -114,6 +119,10 @@ class UptimeSummaryServiceTest {
                 new ApiCheckAggregate(apiId, 10L, 10L, 100.0d, 150, 80),
                 new ApiCheckAggregate(otherId, 10L, 5L, 200.0d, 400, 100)
         ));
+        when(alertRepository.countByStatus(AlertStatus.OPEN)).thenReturn(1L);
+        when(alertRepository.countByStatusAndResolvedAtGreaterThanEqual(eq(AlertStatus.RESOLVED), any()))
+                .thenReturn(2L);
+        when(alertRepository.averageDurationSecondsSince(any())).thenReturn(180.0);
 
         FleetSummaryResponse fleet = uptimeSummaryService.summarizeFleet(24);
 
@@ -123,6 +132,9 @@ class UptimeSummaryServiceTest {
         assertThat(fleet.totalChecks()).isEqualTo(20);
         assertThat(fleet.successfulChecks()).isEqualTo(15);
         assertThat(fleet.fleetUptimePercent()).isEqualTo(75.0);
+        assertThat(fleet.openIncidentCount()).isEqualTo(1);
+        assertThat(fleet.resolvedIncidentCount()).isEqualTo(2);
+        assertThat(fleet.mttrSeconds()).isEqualTo(180.0);
         assertThat(fleet.apis()).hasSize(2);
     }
 }

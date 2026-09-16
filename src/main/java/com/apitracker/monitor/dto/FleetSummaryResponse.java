@@ -17,6 +17,9 @@ public record FleetSummaryResponse(
         long successfulChecks,
         Double fleetUptimePercent,
         Double fleetAvgLatencyMs,
+        long openIncidentCount,
+        long resolvedIncidentCount,
+        Double mttrSeconds,
         List<ApiUptimeSummaryResponse> apis
 ) {
 }

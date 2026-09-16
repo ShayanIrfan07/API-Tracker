@@ -204,6 +204,7 @@ input, select {
 .metric[data-metric="alerts"] .metric-value { color: var(--teal-deep); }
 .metric[data-metric="uptime"] .metric-value { color: var(--teal); }
 .metric[data-metric="latency"] .metric-value { color: var(--ink); }
+.metric[data-metric="mttr"] .metric-value { color: var(--amber); }
 
 .metric-label {
   color: var(--muted);

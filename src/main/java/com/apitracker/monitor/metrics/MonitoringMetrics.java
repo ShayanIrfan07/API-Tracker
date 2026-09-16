@@ -44,6 +44,17 @@ public class MonitoringMetrics {
                 .increment();
     }
 
+    public void recordAlertResolved(Long durationSeconds) {
+        Counter.builder("api_tracker_alerts_resolved_total")
+                .register(meterRegistry)
+                .increment();
+        if (durationSeconds != null && durationSeconds >= 0) {
+            Timer.builder("api_tracker_incident_duration")
+                    .register(meterRegistry)
+                    .record(durationSeconds, TimeUnit.SECONDS);
+        }
+    }
+
     public void recordRetentionDeleted(long count) {
         Counter.builder("api_tracker_check_results_purged_total")
                 .register(meterRegistry)
