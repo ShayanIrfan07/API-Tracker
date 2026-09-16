@@ -27,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.web.client.RestClient;
 
 @ExtendWith(MockitoExtension.class)
 class EmailNotificationServiceTest {
@@ -42,6 +43,9 @@ class EmailNotificationServiceTest {
 
     @Mock
     private NotificationLogRepository notificationLogRepository;
+
+    @Mock
+    private RestClient restClient;
 
     @InjectMocks
     private EmailNotificationService emailNotificationService;
@@ -80,6 +84,7 @@ class EmailNotificationServiceTest {
     @Test
     void sendDownDeliversEmailWhenMailConfigured() {
         when(mailProperties.isConfigured()).thenReturn(true);
+        when(mailProperties.usesBrevo()).thenReturn(false);
         when(mailProperties.from()).thenReturn("alerts@apitracker.local");
         when(mailSenderProvider.getIfAvailable()).thenReturn(mailSender);
 
@@ -106,6 +111,7 @@ class EmailNotificationServiceTest {
         alert.setResolvedAt(Instant.parse("2026-08-09T08:05:00Z"));
         alert.setDurationSeconds(300L);
         when(mailProperties.isConfigured()).thenReturn(true);
+        when(mailProperties.usesBrevo()).thenReturn(false);
         when(mailProperties.from()).thenReturn("alerts@apitracker.local");
         when(mailSenderProvider.getIfAvailable()).thenReturn(mailSender);
 
@@ -124,6 +130,7 @@ class EmailNotificationServiceTest {
         emailNotificationService.sendDown(api, alert);
 
         verify(mailSender, never()).send(any(SimpleMailMessage.class));
+        verify(restClient, never()).post();
         ArgumentCaptor<NotificationLog> logCaptor = ArgumentCaptor.forClass(NotificationLog.class);
         verify(notificationLogRepository).save(logCaptor.capture());
         assertThat(logCaptor.getValue().getSuccess()).isFalse();
@@ -147,6 +154,7 @@ class EmailNotificationServiceTest {
     @Test
     void skipsSendWhenMailSenderBeanUnavailable() {
         when(mailProperties.isConfigured()).thenReturn(true);
+        when(mailProperties.usesBrevo()).thenReturn(false);
         when(mailSenderProvider.getIfAvailable()).thenReturn(null);
 
         emailNotificationService.sendDown(api, alert);
@@ -161,6 +169,7 @@ class EmailNotificationServiceTest {
     @Test
     void recordsFailureWhenSmtpSendFails() {
         when(mailProperties.isConfigured()).thenReturn(true);
+        when(mailProperties.usesBrevo()).thenReturn(false);
         when(mailProperties.from()).thenReturn("alerts@apitracker.local");
         when(mailSenderProvider.getIfAvailable()).thenReturn(mailSender);
         doThrow(new RuntimeException("Authentication failed: bad password secret-token"))

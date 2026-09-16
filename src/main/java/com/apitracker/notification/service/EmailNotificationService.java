@@ -6,6 +6,7 @@ import com.apitracker.monitor.entity.MonitoredApi;
 import com.apitracker.notification.entity.NotificationLog;
 import com.apitracker.notification.repository.NotificationLogRepository;
 import java.time.Instant;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -13,10 +14,11 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClient;
 
 /**
  * Sends incident lifecycle emails only (open on DOWN, recovery on UP).
- * Monitoring continues when {@code app.mail.enabled=false} or SMTP is unavailable.
+ * Monitoring continues when {@code MAIL_ENABLED=false} or email is misconfigured.
  */
 @Service
 @RequiredArgsConstructor
@@ -28,6 +30,7 @@ public class EmailNotificationService {
     private final MailProperties mailProperties;
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
     private final NotificationLogRepository notificationLogRepository;
+    private final RestClient restClient;
 
     public void sendDown(MonitoredApi api, Alert alert) {
         String subject = "[API Tracker] " + api.getName() + " DOWN";
@@ -87,31 +90,70 @@ public class EmailNotificationService {
 
         if (!mailProperties.isConfigured()) {
             log.info("Email integration disabled or incomplete; skipping email for alert {}", alert.getId());
-            saveLog(alert, recipient, false, "Email integration disabled or from-address missing");
-            return;
-        }
-
-        JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
-        if (mailSender == null) {
-            log.warn("JavaMailSender bean not available; skipping email for alert {}", alert.getId());
-            saveLog(alert, recipient, false, "JavaMailSender not available");
+            saveLog(alert, recipient, false, "Email integration disabled or incomplete configuration");
             return;
         }
 
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(mailProperties.from());
-            message.setTo(recipient.trim());
-            message.setSubject(subject);
-            message.setText(body);
-            mailSender.send(message);
+            if (mailProperties.usesBrevo()) {
+                sendViaBrevo(recipient, subject, body);
+            } else {
+                sendViaSmtp(recipient, subject, body);
+            }
+
             saveLog(alert, recipient, true, null);
-            log.info("Sent email for alert {} to {}", alert.getId(), recipient);
+            log.info(
+                    "Sent email for alert {} to {} using {}",
+                    alert.getId(),
+                    recipient,
+                    mailProperties.provider());
         } catch (Exception ex) {
             String safeMessage = truncateError(ex.getMessage());
             log.error("Failed to send email for alert {} to {}: {}", alert.getId(), recipient, safeMessage);
             saveLog(alert, recipient, false, safeMessage);
         }
+    }
+
+    private void sendViaSmtp(String recipient, String subject, String body) {
+        JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
+        if (mailSender == null) {
+            throw new IllegalStateException("JavaMailSender bean not available");
+        }
+
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(mailProperties.from());
+        message.setTo(recipient.trim());
+        message.setSubject(subject);
+        message.setText(body);
+        mailSender.send(message);
+    }
+
+    private void sendViaBrevo(String recipient, String subject, String body) {
+        MailProperties.BrevoProperties brevo = mailProperties.brevo();
+        if (brevo == null) {
+            throw new IllegalStateException("Brevo configuration is missing");
+        }
+        if (!StringUtils.hasText(brevo.apiUrl())) {
+            throw new IllegalStateException("Brevo API URL is missing");
+        }
+        if (!StringUtils.hasText(brevo.apiKey())) {
+            throw new IllegalStateException("Brevo API key is missing");
+        }
+
+        BrevoEmailRequest request = new BrevoEmailRequest(
+                new BrevoSender("API Tracker", mailProperties.from()),
+                List.of(new BrevoRecipient(recipient.trim())),
+                subject,
+                body);
+
+        restClient.post()
+                .uri(brevo.apiUrl())
+                .header("accept", "application/json")
+                .header("api-key", brevo.apiKey())
+                .header("content-type", "application/json")
+                .body(request)
+                .retrieve()
+                .toBodilessEntity();
     }
 
     private static String truncateError(String message) {
@@ -144,5 +186,18 @@ public class EmailNotificationService {
                 .errorMessage(errorMessage)
                 .sentAt(Instant.now())
                 .build());
+    }
+
+    private record BrevoEmailRequest(
+            BrevoSender sender,
+            List<BrevoRecipient> to,
+            String subject,
+            String textContent) {
+    }
+
+    private record BrevoSender(String name, String email) {
+    }
+
+    private record BrevoRecipient(String email) {
     }
 }

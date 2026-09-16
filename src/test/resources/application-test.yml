@@ -37,7 +37,11 @@ app:
     ssrf-protection-enabled: false
   mail:
     enabled: false
+    provider: mailpit
     from: noreply@test.local
+    brevo:
+      api-url: https://api.brevo.com/v3/smtp/email
+      api-key:
   jira:
     enabled: false
     base-url:
