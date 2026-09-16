@@ -102,6 +102,29 @@ class MonitoredApiServiceTest {
     }
 
     @Test
+    void createRejectsInvalidUrl() {
+        CreateMonitoredApiRequest request = new CreateMonitoredApiRequest(
+                "Bad URL API",
+                "not-a-url",
+                "/health",
+                HttpMethod.GET,
+                200,
+                3000,
+                60,
+                null,
+                null,
+                null,
+                null,
+                true);
+
+        when(monitoredApiRepository.existsByNameIgnoreCase("Bad URL API")).thenReturn(false);
+
+        assertThatThrownBy(() -> monitoredApiService.create(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("http or https");
+    }
+
+    @Test
     void createRejectsDuplicateName() {
         CreateMonitoredApiRequest request = new CreateMonitoredApiRequest(
                 "Payments API",

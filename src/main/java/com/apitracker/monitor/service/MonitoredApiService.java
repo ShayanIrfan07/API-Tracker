@@ -8,6 +8,7 @@ import com.apitracker.monitor.dto.UpdateMonitoredApiRequest;
 import com.apitracker.monitor.entity.ApiStatus;
 import com.apitracker.monitor.entity.MonitoredApi;
 import com.apitracker.monitor.repository.MonitoredApiRepository;
+import com.apitracker.monitor.validation.MonitorUrlValidator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -30,11 +31,15 @@ public class MonitoredApiService {
             throw new ConflictException("Monitored API with name already exists: " + request.name());
         }
 
+        String baseUrl = normalizeBaseUrl(request.baseUrl());
+        String path = normalizePath(request.path());
+        MonitorUrlValidator.validate(baseUrl, path);
+
         MonitoredApi entity = MonitoredApi.builder()
                 .id(UUID.randomUUID())
                 .name(request.name().trim())
-                .baseUrl(normalizeBaseUrl(request.baseUrl()))
-                .path(normalizePath(request.path()))
+                .baseUrl(baseUrl)
+                .path(path)
                 .httpMethod(request.httpMethod())
                 .expectedStatusCode(request.expectedStatusCode())
                 .timeoutMs(request.timeoutMs())
@@ -75,9 +80,13 @@ public class MonitoredApiService {
             throw new ConflictException("Monitored API with name already exists: " + request.name());
         }
 
+        String baseUrl = normalizeBaseUrl(request.baseUrl());
+        String path = normalizePath(request.path());
+        MonitorUrlValidator.validate(baseUrl, path);
+
         entity.setName(request.name().trim());
-        entity.setBaseUrl(normalizeBaseUrl(request.baseUrl()));
-        entity.setPath(normalizePath(request.path()));
+        entity.setBaseUrl(baseUrl);
+        entity.setPath(path);
         entity.setHttpMethod(request.httpMethod());
         entity.setExpectedStatusCode(request.expectedStatusCode());
         entity.setTimeoutMs(request.timeoutMs());

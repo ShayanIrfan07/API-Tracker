@@ -30,11 +30,13 @@ public record UpdateMonitoredApiRequest(
         Integer expectedStatusCode,
 
         @NotNull(message = "timeoutMs is required")
-        @Positive(message = "timeoutMs must be positive")
+        @Min(value = 100, message = "timeoutMs must be at least 100")
+        @Max(value = 120_000, message = "timeoutMs must be at most 120000")
         Integer timeoutMs,
 
         @NotNull(message = "intervalSeconds is required")
-        @Positive(message = "intervalSeconds must be positive")
+        @Min(value = 10, message = "intervalSeconds must be at least 10")
+        @Max(value = 86_400, message = "intervalSeconds must be at most 86400")
         Integer intervalSeconds,
 
         @NotNull(message = "failureThreshold is required")

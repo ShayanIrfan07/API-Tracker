@@ -149,6 +149,27 @@ class MonitoredApiControllerTest {
     }
 
     @Test
+    void invalidIntervalReturns400() throws Exception {
+        String invalidJson = """
+                {
+                  "name": "Slow Poll",
+                  "baseUrl": "https://example.com",
+                  "path": "/health",
+                  "httpMethod": "GET",
+                  "expectedStatusCode": 200,
+                  "timeoutMs": 3000,
+                  "intervalSeconds": 5
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/monitored-apis")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"));
+    }
+
+    @Test
     void updateReturns200() throws Exception {
         UUID id = UUID.randomUUID();
         UpdateMonitoredApiRequest request = new UpdateMonitoredApiRequest(
