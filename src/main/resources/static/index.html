@@ -38,7 +38,7 @@
     </div>
   </details>
 
-  <main class="layout">
+  <main class="layout" id="mainLayout">
     <section class="summary" aria-label="Status summary">
       <div class="metric" data-metric="total">
         <span class="metric-value" id="metricTotal">0</span>
@@ -111,6 +111,80 @@
           <ul id="alertsList" class="alert-list">
             <li class="empty">Loading…</li>
           </ul>
+        </section>
+
+        <section class="panel" aria-labelledby="incidentsHeading">
+          <div class="panel-head">
+            <h2 id="incidentsHeading">Recent incidents</h2>
+            <p class="panel-sub">Resolved in the last 24h window</p>
+          </div>
+          <ul id="incidentsList" class="alert-list incident-list">
+            <li class="empty">Loading…</li>
+          </ul>
+        </section>
+
+        <section class="panel form-panel" id="editPanel" hidden aria-labelledby="editHeading">
+          <div class="panel-head panel-head-row">
+            <div>
+              <h2 id="editHeading">Edit API</h2>
+              <p class="panel-sub" id="editSub">Update monitoring settings</p>
+            </div>
+            <button type="button" id="cancelEditBtn" class="btn btn-quiet btn-tiny">Cancel</button>
+          </div>
+          <form id="editForm" class="stack-form">
+            <input type="hidden" name="id" id="editApiId" />
+            <label>Name
+              <input name="name" required maxlength="100" />
+            </label>
+            <label>Base URL
+              <input name="baseUrl" required maxlength="500" />
+            </label>
+            <label>Path
+              <input name="path" maxlength="500" />
+            </label>
+            <div class="form-grid">
+              <label>Method
+                <select name="httpMethod">
+                  <option>GET</option>
+                  <option>POST</option>
+                  <option>PUT</option>
+                  <option>PATCH</option>
+                  <option>DELETE</option>
+                  <option>HEAD</option>
+                </select>
+              </label>
+              <label>Expected status
+                <input name="expectedStatusCode" type="number" min="100" max="599" required />
+              </label>
+            </div>
+            <div class="form-grid">
+              <label>Timeout (ms)
+                <input name="timeoutMs" type="number" min="100" max="120000" required />
+              </label>
+              <label>Interval (sec)
+                <input name="intervalSeconds" type="number" min="10" max="86400" required />
+              </label>
+            </div>
+            <div class="form-grid">
+              <label>Failure threshold
+                <input name="failureThreshold" type="number" min="1" required />
+              </label>
+              <label>Success threshold
+                <input name="successThreshold" type="number" min="1" required />
+              </label>
+            </div>
+            <label>Latency threshold (ms, optional)
+              <input name="latencyThresholdMs" type="number" min="1" placeholder="Over this becomes DEGRADED" />
+            </label>
+            <label>Owner email
+              <input name="ownerEmail" type="email" maxlength="255" />
+            </label>
+            <label class="checkbox-label">
+              <input name="enabled" type="checkbox" />
+              Monitoring enabled
+            </label>
+            <button type="submit" class="btn btn-primary btn-wide" id="editSubmitBtn">Save changes</button>
+          </form>
         </section>
 
         <section class="panel form-panel" aria-labelledby="addHeading">

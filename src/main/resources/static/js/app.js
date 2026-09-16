@@ -3,6 +3,7 @@
   const TOKEN_STORAGE = "apiTracker.jwt";
   const USER_STORAGE = "apiTracker.username";
   const REFRESH_MS = 15000;
+  const RECENT_INCIDENTS = 5;
 
   const els = {
     apiKey: document.getElementById("apiKey"),
@@ -16,12 +17,19 @@
     authLoggedIn: document.getElementById("authLoggedIn"),
     loggedInUser: document.getElementById("loggedInUser"),
     statusBanner: document.getElementById("statusBanner"),
+    mainLayout: document.getElementById("mainLayout"),
     apisBody: document.getElementById("apisBody"),
     alertsList: document.getElementById("alertsList"),
+    incidentsList: document.getElementById("incidentsList"),
     checksBody: document.getElementById("checksBody"),
     detailPanel: document.getElementById("detailPanel"),
     detailSub: document.getElementById("detailSub"),
     createForm: document.getElementById("createForm"),
+    editPanel: document.getElementById("editPanel"),
+    editForm: document.getElementById("editForm"),
+    editSub: document.getElementById("editSub"),
+    cancelEditBtn: document.getElementById("cancelEditBtn"),
+    editSubmitBtn: document.getElementById("editSubmitBtn"),
     lastRefresh: document.getElementById("lastRefresh"),
     metricTotal: document.getElementById("metricTotal"),
     metricUp: document.getElementById("metricUp"),
@@ -36,6 +44,8 @@
 
   let selectedApiId = null;
   let refreshTimer = null;
+  let apisById = new Map();
+  let isRefreshing = false;
 
   function getApiKey() {
     return (els.apiKey.value || sessionStorage.getItem(KEY_STORAGE) || "").trim();
@@ -66,6 +76,30 @@
     els.statusBanner.hidden = !message;
     els.statusBanner.textContent = message || "";
     els.statusBanner.classList.toggle("ok", Boolean(ok));
+  }
+
+  function setLoading(loading) {
+    isRefreshing = loading;
+    els.mainLayout.classList.toggle("loading", loading);
+    els.refreshBtn.disabled = loading;
+    els.refreshBtn.classList.toggle("busy", loading);
+    if (loading && isLoggedIn()) {
+      els.apisBody.innerHTML = `<tr><td colspan="7" class="empty">Loading…</td></tr>`;
+      els.alertsList.innerHTML = `<li class="empty">Loading…</li>`;
+      els.incidentsList.innerHTML = `<li class="empty">Loading…</li>`;
+    }
+  }
+
+  async function withBusyButton(button, work) {
+    if (!button) return work();
+    button.disabled = true;
+    button.classList.add("busy");
+    try {
+      return await work();
+    } finally {
+      button.disabled = false;
+      button.classList.remove("busy");
+    }
   }
 
   async function api(path, options = {}) {
@@ -142,6 +176,68 @@
     return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
   }
 
+  function buildUpdatePayload(apiItem, overrides = {}) {
+    return {
+      name: apiItem.name,
+      baseUrl: apiItem.baseUrl,
+      path: apiItem.path || "/",
+      httpMethod: apiItem.httpMethod,
+      expectedStatusCode: apiItem.expectedStatusCode,
+      timeoutMs: apiItem.timeoutMs,
+      intervalSeconds: apiItem.intervalSeconds,
+      failureThreshold: apiItem.failureThreshold,
+      successThreshold: apiItem.successThreshold,
+      latencyThresholdMs: apiItem.latencyThresholdMs ?? null,
+      ownerEmail: apiItem.ownerEmail ?? null,
+      enabled: apiItem.enabled !== false,
+      ...overrides,
+    };
+  }
+
+  function payloadFromForm(form) {
+    const data = new FormData(form);
+    const latencyRaw = data.get("latencyThresholdMs");
+    return {
+      name: data.get("name"),
+      baseUrl: data.get("baseUrl"),
+      path: data.get("path") || "/",
+      httpMethod: data.get("httpMethod"),
+      expectedStatusCode: Number(data.get("expectedStatusCode")),
+      timeoutMs: Number(data.get("timeoutMs")),
+      intervalSeconds: Number(data.get("intervalSeconds")),
+      failureThreshold: Number(data.get("failureThreshold")),
+      successThreshold: Number(data.get("successThreshold")),
+      latencyThresholdMs: latencyRaw ? Number(latencyRaw) : null,
+      ownerEmail: data.get("ownerEmail") || null,
+      enabled: form.elements.enabled ? form.elements.enabled.checked : true,
+    };
+  }
+
+  function openEditForm(apiItem) {
+    els.editPanel.hidden = false;
+    els.editSub.textContent = apiItem.name;
+    els.editForm.elements.id.value = apiItem.id;
+    els.editForm.elements.name.value = apiItem.name;
+    els.editForm.elements.baseUrl.value = apiItem.baseUrl;
+    els.editForm.elements.path.value = apiItem.path || "/";
+    els.editForm.elements.httpMethod.value = apiItem.httpMethod;
+    els.editForm.elements.expectedStatusCode.value = String(apiItem.expectedStatusCode);
+    els.editForm.elements.timeoutMs.value = String(apiItem.timeoutMs);
+    els.editForm.elements.intervalSeconds.value = String(apiItem.intervalSeconds);
+    els.editForm.elements.failureThreshold.value = String(apiItem.failureThreshold);
+    els.editForm.elements.successThreshold.value = String(apiItem.successThreshold);
+    els.editForm.elements.latencyThresholdMs.value =
+      apiItem.latencyThresholdMs != null ? String(apiItem.latencyThresholdMs) : "";
+    els.editForm.elements.ownerEmail.value = apiItem.ownerEmail || "";
+    els.editForm.elements.enabled.checked = apiItem.enabled !== false;
+    els.editPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function closeEditForm() {
+    els.editPanel.hidden = true;
+    els.editForm.reset();
+  }
+
   function renderApis(apis, summaryById) {
     if (!apis.length) {
       els.apisBody.innerHTML = `<tr><td colspan="7" class="empty">No APIs registered yet.</td></tr>`;
@@ -167,9 +263,10 @@
             <td class="actions">
               <button class="btn btn-quiet btn-tiny" data-action="check" data-id="${apiItem.id}">Check</button>
               <button class="btn btn-quiet btn-tiny" data-action="history" data-id="${apiItem.id}" data-name="${escapeHtml(apiItem.name)}">History</button>
+              <button class="btn btn-quiet btn-tiny" data-action="edit" data-id="${apiItem.id}">Edit</button>
               ${
                 disabled
-                  ? ""
+                  ? `<button class="btn btn-primary btn-tiny" data-action="enable" data-id="${apiItem.id}">Enable</button>`
                   : `<button class="btn btn-danger btn-tiny" data-action="disable" data-id="${apiItem.id}">Disable</button>`
               }
             </td>
@@ -198,6 +295,24 @@
                   : escapeHtml(alert.jiraIssueKey)
               }</span>`
             : ""}
+        </li>`
+      )
+      .join("");
+  }
+
+  function renderIncidents(incidents) {
+    if (!incidents.length) {
+      els.incidentsList.innerHTML = `<li class="empty">No resolved incidents yet.</li>`;
+      return;
+    }
+
+    els.incidentsList.innerHTML = incidents
+      .map(
+        (incident) => `
+        <li class="alert-item resolved">
+          <strong>${escapeHtml(incident.apiName)}</strong>
+          <span>Resolved ${escapeHtml(formatTime(incident.resolvedAt))} · duration ${escapeHtml(formatDurationSeconds(incident.durationSeconds))}</span>
+          ${incident.failureReason ? `<span class="endpoint">${escapeHtml(incident.failureReason)}</span>` : ""}
         </li>`
       )
       .join("");
@@ -251,29 +366,44 @@
     els.metricMttr.textContent = formatDurationSeconds(fleet?.mttrSeconds);
   }
 
+  function recentResolvedIncidents(incidents, windowStart) {
+    const cutoff = windowStart ? Date.parse(windowStart) : 0;
+    return incidents
+      .filter((item) => item.resolvedAt && (!cutoff || Date.parse(item.resolvedAt) >= cutoff))
+      .sort((a, b) => Date.parse(b.resolvedAt) - Date.parse(a.resolvedAt))
+      .slice(0, RECENT_INCIDENTS);
+  }
+
   async function refresh() {
     if (!isLoggedIn()) {
       showBanner("Login with admin/admin (or set an API key under Advanced)");
       els.apisBody.innerHTML = `<tr><td colspan="7" class="empty">Sign in to load monitored APIs.</td></tr>`;
       els.alertsList.innerHTML = `<li class="empty">Sign in to load alerts.</li>`;
+      els.incidentsList.innerHTML = `<li class="empty">Sign in to load incidents.</li>`;
       return;
     }
 
+    if (isRefreshing) return;
+
+    setLoading(true);
     try {
-      const [apis, alerts, fleet] = await Promise.all([
+      const [apis, alerts, resolved, fleet] = await Promise.all([
         api("/api/v1/monitored-apis"),
         api("/api/v1/alerts?status=OPEN"),
+        api("/api/v1/alerts?status=RESOLVED"),
         api("/api/v1/summary?hours=24"),
       ]);
+      apisById = new Map(apis.map((item) => [item.id, item]));
       const summaryById = new Map((fleet.apis || []).map((item) => [item.apiId, item]));
       renderApis(apis, summaryById);
       renderAlerts(alerts);
+      renderIncidents(recentResolvedIncidents(resolved, fleet.windowStart));
       updateMetrics(apis, alerts, fleet);
       showBanner("");
       els.lastRefresh.textContent = `Updated ${new Date().toLocaleTimeString()}`;
 
       if (selectedApiId) {
-        const selected = apis.find((item) => item.id === selectedApiId);
+        const selected = apisById.get(selectedApiId);
         if (selected) {
           const [history, summary] = await Promise.all([
             api(`/api/v1/monitored-apis/${selectedApiId}/checks?size=20`),
@@ -286,6 +416,9 @@
       showBanner(error.message || "Failed to load data");
       els.apisBody.innerHTML = `<tr><td colspan="7" class="empty">Unable to load APIs.</td></tr>`;
       els.alertsList.innerHTML = `<li class="empty">Unable to load alerts.</li>`;
+      els.incidentsList.innerHTML = `<li class="empty">Unable to load incidents.</li>`;
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -320,6 +453,7 @@
   function logout() {
     sessionStorage.removeItem(TOKEN_STORAGE);
     sessionStorage.removeItem(USER_STORAGE);
+    closeEditForm();
     updateAuthUi();
     showBanner("Logged out");
     refresh();
@@ -330,30 +464,44 @@
     if (!button) return;
     const id = button.getAttribute("data-id");
     const action = button.getAttribute("data-action");
+    const apiItem = apisById.get(id);
 
     try {
-      if (action === "check") {
-        const result = await api(`/api/v1/monitored-apis/${id}/check-now`, { method: "POST" });
-        const http = result.httpStatus ?? "—";
-        const latency = result.latencyMs != null ? `${result.latencyMs} ms` : "—";
-        const detail = result.errorMessage ? ` · ${result.errorMessage}` : "";
-        showBanner(
-          `${result.apiName}: ${result.currentStatus} · HTTP ${http} · ${latency}${detail}`,
-          Boolean(result.success)
-        );
-        await refresh();
-      } else if (action === "disable") {
-        await api(`/api/v1/monitored-apis/${id}`, { method: "DELETE" });
-        showBanner("API disabled", true);
-        await refresh();
-      } else if (action === "history") {
-        selectedApiId = id;
-        const [history, summary] = await Promise.all([
-          api(`/api/v1/monitored-apis/${id}/checks?size=20`),
-          api(`/api/v1/monitored-apis/${id}/summary?hours=24`),
-        ]);
-        renderChecks(button.getAttribute("data-name") || "API", history, summary);
-      }
+      await withBusyButton(button, async () => {
+        if (action === "check") {
+          const result = await api(`/api/v1/monitored-apis/${id}/check-now`, { method: "POST" });
+          const http = result.httpStatus ?? "—";
+          const latency = result.latencyMs != null ? `${result.latencyMs} ms` : "—";
+          const detail = result.errorMessage ? ` · ${result.errorMessage}` : "";
+          showBanner(
+            `${result.apiName}: ${result.currentStatus} · HTTP ${http} · ${latency}${detail}`,
+            Boolean(result.success)
+          );
+          await refresh();
+        } else if (action === "disable") {
+          await api(`/api/v1/monitored-apis/${id}`, { method: "DELETE" });
+          showBanner("API disabled", true);
+          await refresh();
+        } else if (action === "enable") {
+          if (!apiItem) throw new Error("API not found in cache");
+          await api(`/api/v1/monitored-apis/${id}`, {
+            method: "PUT",
+            body: JSON.stringify(buildUpdatePayload(apiItem, { enabled: true })),
+          });
+          showBanner(`${apiItem.name} monitoring enabled`, true);
+          await refresh();
+        } else if (action === "edit") {
+          if (!apiItem) throw new Error("API not found in cache");
+          openEditForm(apiItem);
+        } else if (action === "history") {
+          selectedApiId = id;
+          const [history, summary] = await Promise.all([
+            api(`/api/v1/monitored-apis/${id}/checks?size=20`),
+            api(`/api/v1/monitored-apis/${id}/summary?hours=24`),
+          ]);
+          renderChecks(button.getAttribute("data-name") || "API", history, summary);
+        }
+      });
     } catch (error) {
       showBanner(error.message || "Action failed");
     }
@@ -377,22 +525,46 @@
     };
 
     try {
-      await api("/api/v1/monitored-apis", {
-        method: "POST",
-        body: JSON.stringify(payload),
+      await withBusyButton(els.createForm.querySelector('button[type="submit"]'), async () => {
+        await api("/api/v1/monitored-apis", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        els.createForm.reset();
+        els.createForm.elements.path.value = "/health";
+        els.createForm.elements.expectedStatusCode.value = "200";
+        els.createForm.elements.timeoutMs.value = "3000";
+        els.createForm.elements.intervalSeconds.value = "60";
+        els.createForm.elements.httpMethod.value = "GET";
+        showBanner("API registered", true);
+        await refresh();
       });
-      els.createForm.reset();
-      els.createForm.elements.path.value = "/health";
-      els.createForm.elements.expectedStatusCode.value = "200";
-      els.createForm.elements.timeoutMs.value = "3000";
-      els.createForm.elements.intervalSeconds.value = "60";
-      els.createForm.elements.httpMethod.value = "GET";
-      showBanner("API registered", true);
-      await refresh();
     } catch (error) {
       showBanner(error.message || "Create failed");
     }
   });
+
+  els.editForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const id = els.editForm.elements.id.value;
+    const payload = payloadFromForm(els.editForm);
+
+    try {
+      await withBusyButton(els.editSubmitBtn, async () => {
+        await api(`/api/v1/monitored-apis/${id}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+        closeEditForm();
+        showBanner("API updated", true);
+        await refresh();
+      });
+    } catch (error) {
+      showBanner(error.message || "Update failed");
+    }
+  });
+
+  els.cancelEditBtn.addEventListener("click", () => closeEditForm());
 
   els.saveKeyBtn.addEventListener("click", () => {
     sessionStorage.setItem(KEY_STORAGE, els.apiKey.value.trim());
