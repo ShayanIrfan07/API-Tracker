@@ -91,4 +91,81 @@ class StatusEvaluatorTest {
         assertThat(api.getConsecutiveSuccesses()).isEqualTo(1);
         assertThat(api.getCurrentStatus()).isEqualTo(ApiStatus.UNKNOWN);
     }
+
+    @Test
+    void singleFailureDoesNotMarkDown() {
+        EvaluationResult result = statusEvaluator.apply(api, false, null, checkedAt);
+
+        assertThat(result.changed()).isFalse();
+        assertThat(api.getCurrentStatus()).isEqualTo(ApiStatus.UNKNOWN);
+        assertThat(api.getConsecutiveFailures()).isEqualTo(1);
+    }
+
+    @Test
+    void staysDownWithoutStatusChangeWhenFailuresContinue() {
+        api.setCurrentStatus(ApiStatus.DOWN);
+        api.setConsecutiveFailures(3);
+
+        EvaluationResult result = statusEvaluator.apply(api, false, null, checkedAt);
+
+        assertThat(result.changed()).isFalse();
+        assertThat(api.getCurrentStatus()).isEqualTo(ApiStatus.DOWN);
+        assertThat(api.getConsecutiveFailures()).isEqualTo(4);
+    }
+
+    @Test
+    void marksUpWhenLatencyThresholdDisabledEvenIfSlow() {
+        api.setLatencyThresholdMs(null);
+        statusEvaluator.apply(api, true, 500, checkedAt);
+        EvaluationResult result = statusEvaluator.apply(api, true, 800, checkedAt.plusSeconds(1));
+
+        assertThat(result.changed()).isTrue();
+        assertThat(result.current()).isEqualTo(ApiStatus.UP);
+    }
+
+    @Test
+    void recoversFromDegradedToUpWhenLatencyNormalizes() {
+        api.setCurrentStatus(ApiStatus.DEGRADED);
+        api.setConsecutiveSuccesses(1);
+
+        EvaluationResult result = statusEvaluator.apply(api, true, 50, checkedAt);
+
+        assertThat(result.changed()).isTrue();
+        assertThat(result.previous()).isEqualTo(ApiStatus.DEGRADED);
+        assertThat(result.current()).isEqualTo(ApiStatus.UP);
+    }
+
+    @Test
+    void degradesFromUpWhenLatencySpikes() {
+        api.setCurrentStatus(ApiStatus.UP);
+        api.setConsecutiveSuccesses(2);
+
+        EvaluationResult result = statusEvaluator.apply(api, true, 350, checkedAt);
+
+        assertThat(result.changed()).isTrue();
+        assertThat(result.previous()).isEqualTo(ApiStatus.UP);
+        assertThat(result.current()).isEqualTo(ApiStatus.DEGRADED);
+    }
+
+    @Test
+    void failureResetsSuccessStreak() {
+        api.setConsecutiveSuccesses(2);
+
+        EvaluationResult result = statusEvaluator.apply(api, false, null, checkedAt);
+
+        assertThat(result.changed()).isFalse();
+        assertThat(api.getConsecutiveSuccesses()).isZero();
+        assertThat(api.getConsecutiveFailures()).isEqualTo(1);
+    }
+
+    @Test
+    void updatesLastCheckedAtOnEveryEvaluation() {
+        Instant first = checkedAt;
+        Instant second = checkedAt.plusSeconds(30);
+
+        statusEvaluator.apply(api, true, 20, first);
+        statusEvaluator.apply(api, true, 25, second);
+
+        assertThat(api.getLastCheckedAt()).isEqualTo(second);
+    }
 }

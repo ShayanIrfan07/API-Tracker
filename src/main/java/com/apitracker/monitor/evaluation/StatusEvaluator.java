@@ -5,6 +5,18 @@ import com.apitracker.monitor.entity.MonitoredApi;
 import java.time.Instant;
 import org.springframework.stereotype.Component;
 
+/**
+ * Applies consecutive failure/success thresholds to derive API health status.
+ * <p>
+ * {@link com.apitracker.monitor.entity.ApiStatus#UP} — check succeeded (expected HTTP status, within timeout)
+ * and latency is at or below {@code latencyThresholdMs} when configured.
+ * <p>
+ * {@link com.apitracker.monitor.entity.ApiStatus#DOWN} — {@code failureThreshold} consecutive failed checks
+ * (timeout, connection error, or unexpected HTTP status).
+ * <p>
+ * {@link com.apitracker.monitor.entity.ApiStatus#DEGRADED} — {@code successThreshold} consecutive successful
+ * checks but latency exceeds {@code latencyThresholdMs} (only when that threshold is set).
+ */
 @Component
 public class StatusEvaluator {
 
