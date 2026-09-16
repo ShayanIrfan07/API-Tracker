@@ -14,10 +14,16 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+/**
+ * Sends incident lifecycle emails only (open on DOWN, recovery on UP).
+ * Monitoring continues when {@code app.mail.enabled=false} or SMTP is unavailable.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class EmailNotificationService {
+
+    private static final int ERROR_MESSAGE_MAX_LENGTH = 255;
 
     private final MailProperties mailProperties;
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
@@ -102,9 +108,19 @@ public class EmailNotificationService {
             saveLog(alert, recipient, true, null);
             log.info("Sent email for alert {} to {}", alert.getId(), recipient);
         } catch (Exception ex) {
-            log.error("Failed to send email for alert {} to {}: {}", alert.getId(), recipient, ex.getMessage());
-            saveLog(alert, recipient, false, ex.getMessage());
+            String safeMessage = truncateError(ex.getMessage());
+            log.error("Failed to send email for alert {} to {}: {}", alert.getId(), recipient, safeMessage);
+            saveLog(alert, recipient, false, safeMessage);
         }
+    }
+
+    private static String truncateError(String message) {
+        if (message == null || message.isBlank()) {
+            return "Email send failed";
+        }
+        return message.length() <= ERROR_MESSAGE_MAX_LENGTH
+                ? message
+                : message.substring(0, ERROR_MESSAGE_MAX_LENGTH);
     }
 
     private static String formatDuration(Long durationSeconds) {
