@@ -3,6 +3,9 @@ package com.apitracker.monitor.checker;
 import com.apitracker.config.CheckProperties;
 import com.apitracker.monitor.entity.HttpMethod;
 import com.apitracker.monitor.entity.MonitoredApi;
+import com.apitracker.monitor.validation.MonitorUrlValidator;
+import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.time.Duration;
@@ -28,9 +31,12 @@ public class HttpCheckClient {
         Instant started = Instant.now();
 
         try {
-            SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-            requestFactory.setConnectTimeout(api.getTimeoutMs());
-            requestFactory.setReadTimeout(api.getTimeoutMs());
+            MonitorUrlValidator.validate(
+                    api.getBaseUrl(),
+                    api.getPath(),
+                    checkProperties.ssrfProtectionEnabled());
+
+            SimpleClientHttpRequestFactory requestFactory = createRequestFactory(api);
 
             RestClient restClient = RestClient.builder()
                     .requestFactory(requestFactory)
@@ -73,6 +79,19 @@ public class HttpCheckClient {
             log.warn("Unexpected error checking apiId={} url={}", api.getId(), url, ex);
             return HttpCheckOutcome.failed(null, latencyMs, truncate(ex.getMessage()), isTimeout(ex));
         }
+    }
+
+    private SimpleClientHttpRequestFactory createRequestFactory(MonitoredApi api) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory() {
+            @Override
+            protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
+                super.prepareConnection(connection, httpMethod);
+                connection.setInstanceFollowRedirects(false);
+            }
+        };
+        requestFactory.setConnectTimeout(api.getTimeoutMs());
+        requestFactory.setReadTimeout(api.getTimeoutMs());
+        return requestFactory;
     }
 
     private org.springframework.http.HttpMethod toSpringMethod(HttpMethod method) {

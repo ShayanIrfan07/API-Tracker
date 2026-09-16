@@ -33,7 +33,8 @@ class HttpCheckClientTest {
                 10,
                 1000,
                 30,
-                true));
+                true,
+                false));
     }
 
     @AfterEach
@@ -88,6 +89,26 @@ class HttpCheckClientTest {
         assertThat(outcome.success()).isFalse();
         assertThat(outcome.timedOut()).isTrue();
         assertThat(outcome.errorMessage()).isNotBlank();
+    }
+
+    @Test
+    void blocksLoopbackTargetWhenSsrfProtectionEnabled() {
+        HttpCheckClient protectedClient = new HttpCheckClient(new CheckProperties(
+                false,
+                60_000L,
+                1,
+                1,
+                10,
+                1000,
+                30,
+                true,
+                true));
+        MonitoredApi api = sampleApi(HttpMethod.GET, "/health", 200, 1000);
+
+        HttpCheckOutcome outcome = protectedClient.check(api);
+
+        assertThat(outcome.success()).isFalse();
+        assertThat(outcome.errorMessage()).contains("disallowed");
     }
 
     @Test

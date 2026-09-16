@@ -11,7 +11,8 @@ public record CheckProperties(
         int poolQueueCapacity,
         int errorMessageMaxLength,
         int retentionDays,
-        boolean retentionEnabled
+        boolean retentionEnabled,
+        boolean ssrfProtectionEnabled
 ) {
     public CheckProperties {
         if (tickMs <= 0) {

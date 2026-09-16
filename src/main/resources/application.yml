@@ -80,6 +80,7 @@ app:
     retention-enabled: ${CHECK_RETENTION_ENABLED:true}
     retention-days: ${CHECK_RETENTION_DAYS:30}
     retention-cron: ${CHECK_RETENTION_CRON:0 30 2 * * *}
+    ssrf-protection-enabled: ${CHECK_SSRF_PROTECTION_ENABLED:true}
   mail:
     enabled: ${MAIL_ENABLED:false}
     from: ${MAIL_FROM:noreply@apitracker.local}

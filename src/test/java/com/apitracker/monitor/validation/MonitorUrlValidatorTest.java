@@ -46,4 +46,45 @@ class MonitorUrlValidatorTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("credentials");
     }
+
+    @Test
+    void rejectsLocalhostHostname() {
+        assertThatThrownBy(() -> MonitorUrlValidator.validate("http://localhost", "/health"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not allowed");
+    }
+
+    @Test
+    void rejectsLoopbackIpLiteral() {
+        assertThatThrownBy(() -> MonitorUrlValidator.validate("http://127.0.0.1", "/health"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("disallowed");
+    }
+
+    @Test
+    void rejectsPrivateNetworkIpLiteral() {
+        assertThatThrownBy(() -> MonitorUrlValidator.validate("http://192.168.0.10", "/health"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("disallowed");
+    }
+
+    @Test
+    void rejectsLinkLocalMetadataIp() {
+        assertThatThrownBy(() -> MonitorUrlValidator.validate("http://169.254.169.254", "/latest/meta-data"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("disallowed");
+    }
+
+    @Test
+    void rejectsMetadataHostname() {
+        assertThatThrownBy(() -> MonitorUrlValidator.validate("http://metadata.google.internal", "/computeMetadata/v1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not allowed");
+    }
+
+    @Test
+    void skipsSsrfChecksWhenDisabled() {
+        assertThatCode(() -> MonitorUrlValidator.validate("http://127.0.0.1", "/health", false))
+                .doesNotThrowAnyException();
+    }
 }

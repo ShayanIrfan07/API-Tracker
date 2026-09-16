@@ -125,6 +125,29 @@ class MonitoredApiServiceTest {
     }
 
     @Test
+    void createRejectsPrivateNetworkUrl() {
+        CreateMonitoredApiRequest request = new CreateMonitoredApiRequest(
+                "Internal API",
+                "http://192.168.1.50",
+                "/health",
+                HttpMethod.GET,
+                200,
+                3000,
+                60,
+                null,
+                null,
+                null,
+                null,
+                true);
+
+        when(monitoredApiRepository.existsByNameIgnoreCase("Internal API")).thenReturn(false);
+
+        assertThatThrownBy(() -> monitoredApiService.create(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("disallowed");
+    }
+
+    @Test
     void createRejectsDuplicateName() {
         CreateMonitoredApiRequest request = new CreateMonitoredApiRequest(
                 "Payments API",
