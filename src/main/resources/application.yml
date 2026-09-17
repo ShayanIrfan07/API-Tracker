@@ -42,8 +42,10 @@ management:
       show-details: when_authorized
   health:
     mail:
-      # Follows MAIL_ENABLED so unused/misconfigured SMTP does not mark health DOWN
-      enabled: ${MAIL_ENABLED:false}
+      # Do NOT tie to MAIL_ENABLED: Brevo uses HTTP API, not JavaMailSender. When MAIL_ENABLED=true
+      # on Render, mail health would probe spring.mail.host (default localhost:1025) and return 503,
+      # causing Render's /actuator/health check to fail for the full 15-minute deploy window.
+      enabled: ${MAIL_SMTP_HEALTH_ENABLED:false}
   metrics:
     tags:
       application: ${spring.application.name}
@@ -83,7 +85,11 @@ app:
     ssrf-protection-enabled: ${CHECK_SSRF_PROTECTION_ENABLED:true}
   mail:
     enabled: ${MAIL_ENABLED:false}
+    provider: ${MAIL_PROVIDER:mailpit}
     from: ${MAIL_FROM:noreply@apitracker.local}
+    brevo:
+      api-url: ${BREVO_API_URL:https://api.brevo.com/v3/smtp/email}
+      api-key: ${BREVO_API_KEY:}
   jira:
     enabled: ${JIRA_ENABLED:false}
     base-url: ${JIRA_BASE_URL:}
