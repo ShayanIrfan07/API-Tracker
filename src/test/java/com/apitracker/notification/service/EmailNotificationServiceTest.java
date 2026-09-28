@@ -13,9 +13,12 @@ import com.apitracker.config.MailProperties;
 import com.apitracker.monitor.entity.ApiStatus;
 import com.apitracker.monitor.entity.HttpMethod;
 import com.apitracker.monitor.entity.MonitoredApi;
+import com.apitracker.monitor.entity.CheckResult;
+import com.apitracker.monitor.repository.CheckResultRepository;
 import com.apitracker.notification.entity.NotificationLog;
 import com.apitracker.notification.repository.NotificationLogRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,12 +27,17 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.web.client.RestClient;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class EmailNotificationServiceTest {
 
     @Mock
@@ -46,6 +54,9 @@ class EmailNotificationServiceTest {
 
     @Mock
     private RestClient restClient;
+
+    @Mock
+    private CheckResultRepository checkResultRepository;
 
     @InjectMocks
     private EmailNotificationService emailNotificationService;
@@ -79,6 +90,11 @@ class EmailNotificationServiceTest {
                 .build();
         when(notificationLogRepository.save(any(NotificationLog.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        when(checkResultRepository.findByMonitoredApiIdOrderByCheckedAtDesc(any(UUID.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(CheckResult.builder()
+                        .httpStatus(500)
+                        .latencyMs(850)
+                        .build())));
     }
 
     @Test
@@ -95,8 +111,11 @@ class EmailNotificationServiceTest {
         SimpleMailMessage message = messageCaptor.getValue();
         assertThat(message.getFrom()).isEqualTo("alerts@apitracker.local");
         assertThat(message.getTo()).containsExactly("oncall@example.com");
-        assertThat(message.getSubject()).contains("DOWN");
-        assertThat(message.getText()).contains("Payments API");
+        assertThat(message.getSubject()).isEqualTo("[API TRACKER] API DOWN - Payments API");
+        assertThat(message.getText()).contains("Incident ID:");
+        assertThat(message.getText()).contains("Expected Status: 200");
+        assertThat(message.getText()).contains("Actual Status: 500");
+        assertThat(message.getText()).contains("Latency: 850 ms");
         assertThat(message.getText()).contains("Connection refused");
 
         ArgumentCaptor<NotificationLog> logCaptor = ArgumentCaptor.forClass(NotificationLog.class);
@@ -119,8 +138,9 @@ class EmailNotificationServiceTest {
 
         ArgumentCaptor<SimpleMailMessage> messageCaptor = ArgumentCaptor.forClass(SimpleMailMessage.class);
         verify(mailSender).send(messageCaptor.capture());
-        assertThat(messageCaptor.getValue().getSubject()).contains("RECOVERED");
-        assertThat(messageCaptor.getValue().getText()).contains("5m");
+        assertThat(messageCaptor.getValue().getSubject()).isEqualTo("[API TRACKER] API RECOVERED - Payments API");
+        assertThat(messageCaptor.getValue().getText()).contains("Incident Duration: 5m");
+        assertThat(messageCaptor.getValue().getText()).contains("Incident ID:");
     }
 
     @Test

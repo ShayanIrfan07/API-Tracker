@@ -58,7 +58,7 @@ public class AlertService {
                 .monitoredApi(api)
                 .status(AlertStatus.OPEN)
                 .openedAt(Instant.now())
-                .summary("[API Tracker] " + api.getName() + " is DOWN")
+                .summary("[API TRACKER] API DOWN - " + api.getName())
                 .detail(detail)
                 .failureReason(failureReason)
                 .build();
@@ -101,7 +101,7 @@ public class AlertService {
         emailNotificationService.sendRecovered(api, alert);
         monitoringMetrics.recordAlertResolved(alert.getDurationSeconds());
         log.info(
-                "Incident recovered alertId={} apiId={} apiName='{}' durationSeconds={}",
+                "Incident recovered alertId={} apiId={} apiName='{}' durationSeconds={}; recovery notification dispatched",
                 alert.getId(),
                 api.getId(),
                 api.getName(),

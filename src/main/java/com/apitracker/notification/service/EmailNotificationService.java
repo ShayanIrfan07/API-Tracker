@@ -2,14 +2,18 @@ package com.apitracker.notification.service;
 
 import com.apitracker.alert.entity.Alert;
 import com.apitracker.config.MailProperties;
+import com.apitracker.monitor.entity.CheckResult;
 import com.apitracker.monitor.entity.MonitoredApi;
 import com.apitracker.notification.entity.NotificationLog;
 import com.apitracker.notification.repository.NotificationLogRepository;
+import com.apitracker.monitor.repository.CheckResultRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -30,60 +34,65 @@ public class EmailNotificationService {
     private final MailProperties mailProperties;
     private final ObjectProvider<JavaMailSender> mailSenderProvider;
     private final NotificationLogRepository notificationLogRepository;
+    private final CheckResultRepository checkResultRepository;
     private final RestClient restClient;
 
     public void sendDown(MonitoredApi api, Alert alert) {
-        String subject = "[API Tracker] " + api.getName() + " DOWN";
+        CheckSnapshot check = latestCheck(api.getId());
+        String subject = "[API TRACKER] API DOWN - " + api.getName();
         String body = """
-                API Tracker alert: DOWN
+                API Name: %s
+                API URL: %s
+                Status: DOWN
+                Expected Status: %s
+                Actual Status: %s
+                Latency: %s
+                Failure Reason: %s
+                Incident ID: %s
+                Detected At: %s
 
-                API: %s
-                URL: %s%s
-                Opened at: %s
-                Failure reason: %s
-                Jira: %s
-
-                Details:
+                Recent check history:
                 %s
                 """.formatted(
                 api.getName(),
-                api.getBaseUrl(),
-                api.getPath(),
-                alert.getOpenedAt(),
+                api.getBaseUrl() + api.getPath(),
+                api.getExpectedStatusCode(),
+                formatActualStatus(check),
+                formatLatency(check),
                 alert.getFailureReason() == null ? "(unknown)" : alert.getFailureReason(),
-                alert.getJiraIssueKey() == null ? "(not created)" : alert.getJiraIssueKey(),
+                alert.getId(),
+                alert.getOpenedAt(),
                 alert.getDetail() == null ? "(none)" : alert.getDetail());
         send(api, alert, subject, body);
     }
 
     public void sendRecovered(MonitoredApi api, Alert alert) {
-        String subject = "[API Tracker] " + api.getName() + " RECOVERED";
+        String subject = "[API TRACKER] API RECOVERED - " + api.getName();
         String body = """
-                API Tracker alert: RECOVERED
-
-                API: %s
-                URL: %s%s
-                Opened at: %s
-                Resolved at: %s
-                Duration: %s
-                Jira: %s
-
-                The API is UP again. The Jira issue was commented on but not auto-closed.
+                API Name: %s
+                API URL: %s
+                Previous Status: DOWN
+                Current Status: %s
+                Recovery Time: %s
+                Incident Duration: %s
+                Incident ID: %s
                 """.formatted(
                 api.getName(),
-                api.getBaseUrl(),
-                api.getPath(),
-                alert.getOpenedAt(),
+                api.getBaseUrl() + api.getPath(),
+                api.getCurrentStatus(),
                 alert.getResolvedAt(),
                 formatDuration(alert.getDurationSeconds()),
-                alert.getJiraIssueKey() == null ? "(not created)" : alert.getJiraIssueKey());
+                alert.getId());
         send(api, alert, subject, body);
     }
 
     private void send(MonitoredApi api, Alert alert, String subject, String body) {
         String recipient = api.getOwnerEmail();
         if (!StringUtils.hasText(recipient)) {
-            log.info("No ownerEmail configured for API {}; skipping email for alert {}", api.getId(), alert.getId());
+            log.warn(
+                    "Notification skipped: no ownerEmail for apiId={} alertId={}; monitoring continues",
+                    api.getId(),
+                    alert.getId());
             saveLog(alert, null, false, "No ownerEmail configured");
             return;
         }
@@ -103,8 +112,9 @@ public class EmailNotificationService {
 
             saveLog(alert, recipient, true, null);
             log.info(
-                    "Sent email for alert {} to {} using {}",
+                    "Alert notification sent alertId={} apiId={} recipient={} provider={}",
                     alert.getId(),
+                    api.getId(),
                     recipient,
                     mailProperties.provider());
         } catch (Exception ex) {
@@ -163,6 +173,31 @@ public class EmailNotificationService {
         return message.length() <= ERROR_MESSAGE_MAX_LENGTH
                 ? message
                 : message.substring(0, ERROR_MESSAGE_MAX_LENGTH);
+    }
+
+    private CheckSnapshot latestCheck(UUID apiId) {
+        List<CheckResult> recent = checkResultRepository
+                .findByMonitoredApiIdOrderByCheckedAtDesc(apiId, PageRequest.of(0, 1))
+                .getContent();
+        if (recent.isEmpty()) {
+            return CheckSnapshot.empty();
+        }
+        CheckResult latest = recent.getFirst();
+        return new CheckSnapshot(latest.getHttpStatus(), latest.getLatencyMs());
+    }
+
+    private static String formatActualStatus(CheckSnapshot check) {
+        return check.httpStatus() == null ? "(none)" : String.valueOf(check.httpStatus());
+    }
+
+    private static String formatLatency(CheckSnapshot check) {
+        return check.latencyMs() == null ? "(unknown)" : check.latencyMs() + " ms";
+    }
+
+    private record CheckSnapshot(Integer httpStatus, Integer latencyMs) {
+        static CheckSnapshot empty() {
+            return new CheckSnapshot(null, null);
+        }
     }
 
     private static String formatDuration(Long durationSeconds) {

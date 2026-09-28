@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -145,6 +146,16 @@ class HealthCheckServiceTest {
         assertThat(response.timedOut()).isFalse();
         assertThat(response.errorMessage()).isNull();
         assertThat(response.currentStatus()).isEqualTo(ApiStatus.UP);
+    }
+
+    @Test
+    void runScheduledCheckSwallowsExceptionsWithoutRethrowing() {
+        when(monitoredApiRepository.findById(apiId)).thenThrow(new RuntimeException("database blip"));
+
+        healthCheckService.runScheduledCheck(apiId);
+
+        verify(alertService, never()).handleTransitionToDown(any());
+        healthCheckService.end(apiId);
     }
 
     @Test
