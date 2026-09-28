@@ -40,7 +40,13 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+      probes:
+        enabled: true
   health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
     mail:
       # Do NOT tie to MAIL_ENABLED: Brevo uses HTTP API, not JavaMailSender. When MAIL_ENABLED=true
       # on Render, mail health would probe spring.mail.host (default localhost:1025) and return 503,

@@ -3,10 +3,13 @@
 FROM maven:3.9.9-eclipse-temurin-21-alpine AS build
 WORKDIR /workspace
 
+# Cache dependency downloads when only application sources change (Render uses profile no-cache,
+# but this still speeds rebuilds when pom.xml is unchanged).
 COPY pom.xml .
-COPY src ./src
+RUN mvn -B -Dmaven.test.skip=true dependency:go-offline
 
-RUN mvn -B -DskipTests package \
+COPY src/main ./src/main
+RUN mvn -B -Dmaven.test.skip=true package \
     && mv target/api-tracker-*.jar /workspace/app.jar
 
 FROM eclipse-temurin:21-jre-alpine AS runtime

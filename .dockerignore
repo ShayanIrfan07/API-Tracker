@@ -3,6 +3,10 @@ target/
 .github/
 .idea/
 .vscode/
+.cursor/
+.agents/
+kiwi/
+skills-lock.json
 *.iml
 .env
 *.env.local
@@ -12,3 +16,4 @@ mvnw
 mvnw.cmd
 docker-compose.yml
 .gitignore
+src/test/
